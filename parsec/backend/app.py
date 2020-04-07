@@ -2,7 +2,6 @@
 
 from typing import Optional
 import trio
-import attr
 from structlog import get_logger
 from logging import DEBUG as LOG_LEVEL_DEBUG
 from pendulum import now as pendulum_now
@@ -10,6 +9,8 @@ from async_generator import asynccontextmanager
 
 from parsec.event_bus import EventBus
 from parsec.logging import get_log_level
+from parsec.crypto import VerifyKey, PublicKey
+from parsec.api.version import ApiVersion
 from parsec.api.transport import TransportError, TransportClosedByPeer, Transport
 from parsec.api.protocol import (
     packb,
@@ -18,11 +19,12 @@ from parsec.api.protocol import (
     MessageSerializationError,
     InvalidMessageError,
     ServerHandshake,
-    ADMINISTRATION_CMDS,
-    AUTHENTICATED_CMDS,
-    ANONYMOUS_CMDS,
+    OrganizationID,
+    UserID,
+    DeviceName,
+    DeviceID,
 )
-from parsec.backend.utils import check_anonymous_api_allowed, CancelledByNewRequest
+from parsec.backend.utils import CancelledByNewRequest, collect_apis
 from parsec.backend.config import BackendConfig
 from parsec.backend.memory import components_factory as mocked_components_factory
 from parsec.backend.postgresql import components_factory as postgresql_components_factory
@@ -33,39 +35,73 @@ from parsec.backend.organization import OrganizationNotFoundError
 logger = get_logger()
 
 
-@attr.s(slots=True, repr=False)
-class LoggedClientContext:
-    transport = attr.ib()
-    organization_id = attr.ib()
-    is_admin = attr.ib()
-    device_id = attr.ib()
-    public_key = attr.ib()
-    verify_key = attr.ib()
-    event_bus_ctx = attr.ib(default=None)
-    conn_id = attr.ib(init=False)
-    logger = attr.ib(init=False)
-    channels = attr.ib(factory=lambda: trio.open_memory_channel(100))
-    realms = attr.ib(factory=set)
+class BaseClientContext:
+    __slots__ = ("transport",)
 
-    def __repr__(self):
-        return (
-            f"LoggedClientContext(conn={self.conn_id}, "
-            f"org={self.organization_id}, "
-            f"device={self.device_id})"
-        )
+    def __init__(self, transport: Transport):
+        self.transport = transport
 
-    def __attrs_post_init__(self):
+    @property
+    def api_version(self) -> ApiVersion:
+        return self.transport.handshake.backend_api_version
+
+    @property
+    def api_auth(self) -> str:
+        return self.transport.handshake.answer_type
+
+
+class AuthenticatedClientContext(BaseClientContext):
+    __slots__ = (
+        "organization_id",
+        "is_admin",
+        "device_id",
+        "public_key",
+        "verify_key",
+        "event_bus_ctx",
+        "channels",
+        "realms",
+        "conn_id",
+        "logger",
+    )
+
+    def __init__(
+        self,
+        transport: Transport,
+        organization_id: OrganizationID,
+        is_admin: bool,
+        device_id: DeviceID,
+        public_key: PublicKey,
+        verify_key: VerifyKey,
+    ):
+        super().__init__(transport)
+        self.organization_id = organization_id
+        self.is_admin = is_admin
+        self.device_id = device_id
+        self.public_key = public_key
+        self.verify_key = verify_key
+
+        self.event_bus_ctx = None
+        self.channels = trio.open_memory_channel(100)
+        self.realms = set()
+
         self.conn_id = self.transport.conn_id
         self.logger = self.transport.logger = self.transport.logger.bind(
             organization_id=str(self.organization_id), client_id=str(self.device_id)
         )
 
+    def __repr__(self):
+        return (
+            f"AuthenticatedClientContext(conn={self.conn_id}, "
+            f"org={self.organization_id}, "
+            f"device={self.device_id})"
+        )
+
     @property
-    def user_id(self):
+    def user_id(self) -> UserID:
         return self.device_id.user_id
 
     @property
-    def device_name(self):
+    def device_name(self) -> DeviceName:
         return self.device_id.device_name
 
     @property
@@ -79,32 +115,45 @@ class LoggedClientContext:
         return receive_channel
 
 
-@attr.s(slots=True, repr=False)
-class AnonymousClientContext:
-    transport = attr.ib()
-    organization_id = attr.ib()
-    conn_id = attr.ib(init=False)
-    logger = attr.ib(init=False)
-    device_id = None
+class APIV1_AnonymousClientContext(BaseClientContext):
+    __slots__ = ("organization_id", "conn_id", "logger")
 
-    def __repr__(self):
-        return f"AnonymousClientContext(conn={self.conn_id}, org={self.organization_id})"
+    def __init__(self, transport: Transport, organization_id: OrganizationID):
+        super().__init__(transport)
+        self.organization_id = organization_id
 
-    def __attrs_post_init__(self):
         self.conn_id = self.transport.conn_id
         self.logger = self.transport.logger = self.transport.logger.bind(
             organization_id=str(self.organization_id), client_id="<anonymous>"
         )
 
+    def __repr__(self):
+        return f"AnonymousClientContext(conn={self.conn_id}, org={self.organization_id})"
 
-@attr.s
-class AdministrationClientContext:
-    transport = attr.ib()
-    conn_id = attr.ib(init=False)
-    logger = attr.ib(init=False)
-    device_id = None
 
-    def __attrs_post_init__(self):
+class AnonymousClientContext(BaseClientContext):
+    __slots__ = ("organization_id", "token", "conn_id", "logger")
+
+    def __init__(self, transport: Transport, organization_id: OrganizationID, token: str):
+        super().__init__(transport)
+        self.organization_id = organization_id
+        self.token = token
+
+        self.conn_id = self.transport.conn_id
+        self.logger = self.transport.logger = self.transport.logger.bind(
+            organization_id=str(self.organization_id), client_id="<anonymous>"
+        )
+
+    def __repr__(self):
+        return f"AnonymousClientContext(conn={self.conn_id}, org={self.organization_id})"
+
+
+class APIV1_AdministrationClientContext(BaseClientContext):
+    __slots__ = ("conn_id", "logger")
+
+    def __init__(self, transport: Transport):
+        super().__init__(transport)
+
         self.conn_id = self.transport.conn_id
         self.logger = self.transport.logger = self.transport.logger.bind(
             client_id="<administration>"
@@ -167,26 +216,7 @@ class BackendApp:
         self.block = block
         self.events = events
 
-        api_modules = {block, events, message, organization, ping, realm, vlob, user}
-        api_methods = {}
-        for module in api_modules:
-            for method_name in dir(module):
-                if callable(getattr(module, method_name)) and method_name.startswith("api_"):
-                    if (method_name) in api_methods:
-                        raise AttributeError(
-                            f"The api method {method_name} has been defined more than once in "
-                            f"BackendApp modules."
-                        )
-                    api_methods[method_name] = getattr(module, method_name)
-
-        self.logged_cmds = {name: api_methods[f"api_{name}"] for name in AUTHENTICATED_CMDS}
-        self.anonymous_cmds = {name: api_methods[f"api_{name}"] for name in ANONYMOUS_CMDS}
-        self.administration_cmds = {
-            name: api_methods[f"api_{name}"] for name in ADMINISTRATION_CMDS
-        }
-
-        for fn in self.anonymous_cmds.values():
-            check_anonymous_api_allowed(fn)
+        self.apis = collect_apis(block, events, message, organization, ping, realm, vlob, user)
 
     async def _do_handshake(self, transport):
         context = None
@@ -248,7 +278,7 @@ class BackendApp:
                         }
 
                     else:
-                        context = LoggedClientContext(
+                        context = AuthenticatedClientContext(
                             transport,
                             organization_id,
                             user.is_admin,
@@ -260,7 +290,6 @@ class BackendApp:
 
             elif handshake.answer_type == "anonymous":
                 organization_id = handshake.answer_data["organization_id"]
-                expected_rvk = handshake.answer_data["rvk"]
                 try:
                     organization = await self.organization.get(organization_id)
 
@@ -273,15 +302,7 @@ class BackendApp:
                     }
 
                 else:
-                    if expected_rvk and organization.root_verify_key != expected_rvk:
-                        result_req = handshake.build_rvk_mismatch_result_req()
-                        error_infos = {
-                            "reason": "Bad root verify key",
-                            "handshake_type": "anonymous",
-                            "organization_id": organization_id,
-                        }
-
-                    elif (
+                    if (
                         organization.expiration_date is not None
                         and organization.expiration_date <= pendulum_now()
                     ):
@@ -292,13 +313,33 @@ class BackendApp:
                             "organization_id": organization_id,
                         }
 
-                    else:
-                        context = AnonymousClientContext(transport, organization_id)
+                    elif handshake.client_api_version.version == 1:
+                        expected_rvk = handshake.answer_data["rvk"]
+                        if expected_rvk and organization.root_verify_key != expected_rvk:
+                            result_req = handshake.build_rvk_mismatch_result_req()
+                            error_infos = {
+                                "reason": "Bad root verify key",
+                                "handshake_type": "anonymous",
+                                "organization_id": organization_id,
+                            }
+                        else:
+                            context = APIV1_AnonymousClientContext(
+                                transport, organization_id=organization_id
+                            )
+                            result_req = handshake.build_result_req()
+
+                    else:  # v2
+                        context = AnonymousClientContext(
+                            transport,
+                            operation=handshake.answer_data["operation"],
+                            organization_id=organization_id,
+                            token=handshake.answer_data["token"],
+                        )
                         result_req = handshake.build_result_req()
 
             elif handshake.answer_type == "administration":
                 if handshake.answer_data["token"] == self.config.administration_token:
-                    context = AdministrationClientContext(transport)
+                    context = APIV1_AdministrationClientContext(transport)
                     result_req = handshake.build_result_req()
                 else:
                     result_req = handshake.build_bad_administration_token_result_req()
@@ -394,6 +435,9 @@ class BackendApp:
             selected_logger.info("Connection dropped: invalid data", reason=str(exc))
 
     async def _handle_client_loop(self, transport, client_ctx):
+        # Retreive the allowed commands according to api version and auth type
+        api_cmds = self.apis[client_ctx.api_version.version][client_ctx.api_auth]
+
         raw_req = None
         while True:
             # raw_req can be already defined if we received a new request
@@ -407,14 +451,7 @@ class BackendApp:
                 if not isinstance(cmd, str):
                     raise KeyError()
 
-                if isinstance(client_ctx, AdministrationClientContext):
-                    cmd_func = self.administration_cmds[cmd]
-
-                elif isinstance(client_ctx, LoggedClientContext):
-                    cmd_func = self.logged_cmds[cmd]
-
-                else:
-                    cmd_func = self.anonymous_cmds[cmd]
+                cmd_func = api_cmds[cmd]
 
             except KeyError:
                 rep = {"status": "unknown_command", "reason": "Unknown command"}

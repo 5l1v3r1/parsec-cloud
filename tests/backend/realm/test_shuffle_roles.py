@@ -19,7 +19,7 @@ from parsec.api.data import RealmRoleCertificateContent
 from parsec.api.protocol import RealmRole
 
 from tests.common import call_with_control
-from tests.backend.conftest import realm_get_role_certificates, realm_update_roles
+from tests.backend.common import realm_get_role_certificates, realm_update_roles
 
 
 @pytest.mark.slow
@@ -30,7 +30,7 @@ def test_shuffle_roles(
     backend_factory,
     server_factory,
     backend_data_binder_factory,
-    backend_sock_factory,
+    apiv2_backend_sock_factory,
     local_device_factory,
     realm_factory,
     coolorg,
@@ -76,7 +76,7 @@ def test_shuffle_roles(
                 pass
 
             async def _start_sock(device, *, task_status=trio.TASK_STATUS_IGNORED):
-                async with backend_sock_factory(self.backend, device) as sock:
+                async with apiv2_backend_sock_factory(self.backend, device) as sock:
                     task_status.started(sock)
                     await trio.sleep_forever()
 

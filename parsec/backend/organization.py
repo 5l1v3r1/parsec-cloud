@@ -11,15 +11,16 @@ from parsec.utils import timestamps_in_the_ballpark
 from parsec.crypto import VerifyKey
 from parsec.api.protocol import (
     OrganizationID,
-    organization_create_serializer,
+    apiv1_organization_create_serializer,
     organization_bootstrap_serializer,
-    organization_stats_serializer,
-    organization_status_serializer,
-    organization_update_serializer,
+    apiv1_organization_bootstrap_serializer,
+    apiv1_organization_stats_serializer,
+    apiv1_organization_status_serializer,
+    apiv1_organization_update_serializer,
 )
 from parsec.api.data import UserCertificateContent, DeviceCertificateContent, DataError
 from parsec.backend.user import new_user_factory, User, Device
-from parsec.backend.utils import catch_protocol_errors, anonymous_api
+from parsec.backend.utils import catch_protocol_errors, api
 
 
 class OrganizationError(Exception):
@@ -78,9 +79,10 @@ class BaseOrganizationComponent:
     def __init__(self, bootstrap_token_size: int = 32):
         self.bootstrap_token_size = bootstrap_token_size
 
+    @api("organization_create", version=1, auth="administration")
     @catch_protocol_errors
     async def api_organization_create(self, client_ctx, msg):
-        msg = organization_create_serializer.req_load(msg)
+        msg = apiv1_organization_create_serializer.req_load(msg)
 
         bootstrap_token = token_hex(self.bootstrap_token_size)
         expiration_date = msg.get("expiration_date", None)
@@ -98,11 +100,12 @@ class BaseOrganizationComponent:
         if expiration_date:
             rep["expiration_date"] = expiration_date
 
-        return organization_create_serializer.rep_dump(rep)
+        return apiv1_organization_create_serializer.rep_dump(rep)
 
+    @api("organization_status", version=1, auth="administration")
     @catch_protocol_errors
     async def api_organization_status(self, client_ctx, msg):
-        msg = organization_status_serializer.req_load(msg)
+        msg = apiv1_organization_status_serializer.req_load(msg)
 
         try:
             organization = await self.get(msg["organization_id"])
@@ -110,7 +113,7 @@ class BaseOrganizationComponent:
         except OrganizationNotFoundError:
             return {"status": "not_found"}
 
-        return organization_status_serializer.rep_dump(
+        return apiv1_organization_status_serializer.rep_dump(
             {
                 "is_bootstrapped": organization.is_bootstrapped(),
                 "expiration_date": organization.expiration_date,
@@ -118,9 +121,10 @@ class BaseOrganizationComponent:
             }
         )
 
+    @api("organization_stats", version=1, auth="administration")
     @catch_protocol_errors
     async def api_organization_stats(self, client_ctx, msg):
-        msg = organization_stats_serializer.req_load(msg)
+        msg = apiv1_organization_stats_serializer.req_load(msg)
 
         try:
             stats = await self.stats(msg["organization_id"])
@@ -128,7 +132,7 @@ class BaseOrganizationComponent:
         except OrganizationNotFoundError:
             return {"status": "not_found"}
 
-        return organization_stats_serializer.rep_dump(
+        return apiv1_organization_stats_serializer.rep_dump(
             {
                 "status": "ok",
                 "users": stats.users,
@@ -137,9 +141,10 @@ class BaseOrganizationComponent:
             }
         )
 
+    @api("organization_update", version=1, auth="administration")
     @catch_protocol_errors
     async def api_organization_update(self, client_ctx, msg):
-        msg = organization_update_serializer.req_load(msg)
+        msg = apiv1_organization_update_serializer.req_load(msg)
 
         try:
             await self.set_expiration_date(
@@ -149,12 +154,18 @@ class BaseOrganizationComponent:
         except OrganizationNotFoundError:
             return {"status": "not_found"}
 
-        return organization_update_serializer.rep_dump({"status": "ok"})
+        return apiv1_organization_update_serializer.rep_dump({"status": "ok"})
 
-    @anonymous_api
+    @api("organization_bootstrap", auth="anonymous")
     @catch_protocol_errors
     async def api_organization_bootstrap(self, client_ctx, msg):
-        msg = organization_bootstrap_serializer.req_load(msg)
+        if client_ctx.api_version.version == 1:
+            msg = apiv1_organization_bootstrap_serializer.req_load(msg)
+            bootstrap_token = msg["bootstrap_token"]
+        else:  # v2
+            msg = organization_bootstrap_serializer.req_load(msg)
+            bootstrap_token = client_ctx.token
+
         root_verify_key = msg["root_verify_key"]
 
         try:
@@ -200,11 +211,7 @@ class BaseOrganizationComponent:
         )
         try:
             await self.bootstrap(
-                client_ctx.organization_id,
-                user,
-                first_device,
-                msg["bootstrap_token"],
-                root_verify_key,
+                client_ctx.organization_id, user, first_device, bootstrap_token, root_verify_key
             )
 
         except OrganizationAlreadyBootstrappedError:

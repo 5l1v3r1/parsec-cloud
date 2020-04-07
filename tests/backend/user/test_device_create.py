@@ -23,7 +23,9 @@ async def device_create(sock, **kwargs):
 
 
 @pytest.mark.trio
-async def test_device_create_ok(backend, backend_sock_factory, alice_backend_sock, alice, alice_nd):
+async def test_device_create_ok(
+    backend, apiv2_backend_sock_factory, alice_backend_sock, alice, alice_nd
+):
     now = pendulum.now()
     device_certificate = DeviceCertificateContent(
         author=alice.device_id,
@@ -50,7 +52,7 @@ async def test_device_create_ok(backend, backend_sock_factory, alice_backend_soc
         )
 
     # Make sure the new device can connect now
-    async with backend_sock_factory(backend, alice_nd) as sock:
+    async with apiv2_backend_sock_factory(backend, alice_nd) as sock:
         await sock.send(packb({"cmd": "ping", "ping": "Hello world !"}))
         raw_rep = await sock.recv()
         rep = ping_serializer.rep_loads(raw_rep)

@@ -1,14 +1,13 @@
 # Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2019 Scille SAS
 
-import attr
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from secrets import token_bytes
 
-from parsec.crypto import CryptoError
+from parsec.crypto import SigningKey, VerifyKey, CryptoError
 from parsec.serde import BaseSchema, OneOfSchema, fields, validate
 from parsec.api.protocol.base import ProtocolError, InvalidMessageError, serializer_factory
-from parsec.api.protocol.types import OrganizationIDField, DeviceIDField
-from parsec.api.version import ApiVersion, API_VERSION
+from parsec.api.protocol.types import OrganizationID, DeviceID, OrganizationIDField, DeviceIDField
+from parsec.api.version import ApiVersion, API_V1_VERSION, API_V2_VERSION
 
 
 class HandshakeError(ProtocolError):
@@ -40,7 +39,9 @@ class HandshakeRevokedDevice(HandshakeError):
 
 
 class HandshakeAPIVersionError(HandshakeError):
-    def __init__(self, backend_versions: ApiVersion, client_versions: ApiVersion):
+    def __init__(
+        self, backend_versions: List[ApiVersion], client_versions: List[ApiVersion] = None
+    ):
         self.client_versions = client_versions
         self.backend_versions = backend_versions
         client_versions_str = "{" + ", ".join(map(str, client_versions)) + "}"
@@ -86,6 +87,14 @@ class HandshakeChallengeSchema(BaseSchema):
 handshake_challenge_serializer = serializer_factory(HandshakeChallengeSchema)
 
 
+class HandshakeAnswerVersionOnlySchema(BaseSchema):
+    handshake = fields.CheckedConstant("answer", required=True)
+    client_api_version = ApiVersionField(required=True)
+
+
+handshake_answer_version_only_serializer = serializer_factory(HandshakeAnswerVersionOnlySchema)
+
+
 class HandshakeAuthenticatedAnswerSchema(BaseSchema):
     handshake = fields.CheckedConstant("answer", required=True)
     type = fields.CheckedConstant("authenticated", required=True)
@@ -96,7 +105,19 @@ class HandshakeAuthenticatedAnswerSchema(BaseSchema):
     answer = fields.Bytes(required=True)
 
 
+ANONYMOUS_OPERATIONS = ("bootstrap_organization", "claim_user", "claim_device")
+
+
 class HandshakeAnonymousAnswerSchema(BaseSchema):
+    handshake = fields.CheckedConstant("answer", required=True)
+    type = fields.CheckedConstant("anonymous", required=True)
+    client_api_version = ApiVersionField(required=True)
+    organization_id = OrganizationIDField(required=True)
+    operation = fields.String(required=True, validate=validate.OneOf(ANONYMOUS_OPERATIONS))
+    token = fields.String(required=True)
+
+
+class APIV1_HandshakeAnonymousAnswerSchema(BaseSchema):
     handshake = fields.CheckedConstant("answer", required=True)
     type = fields.CheckedConstant("anonymous", required=True)
     client_api_version = ApiVersionField(required=True)
@@ -105,7 +126,7 @@ class HandshakeAnonymousAnswerSchema(BaseSchema):
     rvk = fields.VerifyKey(missing=None)
 
 
-class HandshakeAdministrationAnswerSchema(BaseSchema):
+class APIV1_HandshakeAdministrationAnswerSchema(BaseSchema):
     handshake = fields.CheckedConstant("answer", required=True)
     type = fields.CheckedConstant("administration", required=True)
     client_api_version = ApiVersionField(required=True)
@@ -118,7 +139,6 @@ class HandshakeAnswerSchema(OneOfSchema):
     type_schemas = {
         "authenticated": HandshakeAuthenticatedAnswerSchema(),
         "anonymous": HandshakeAnonymousAnswerSchema(),
-        "administration": HandshakeAdministrationAnswerSchema(),
     }
 
     def get_obj_type(self, obj):
@@ -126,6 +146,22 @@ class HandshakeAnswerSchema(OneOfSchema):
 
 
 handshake_answer_serializer = serializer_factory(HandshakeAnswerSchema)
+
+
+class APIV1_HandshakeAnswerSchema(OneOfSchema):
+    type_field = "type"
+    type_field_remove = False
+    type_schemas = {
+        "authenticated": HandshakeAuthenticatedAnswerSchema(),
+        "anonymous": APIV1_HandshakeAnonymousAnswerSchema(),
+        "administration": APIV1_HandshakeAdministrationAnswerSchema(),
+    }
+
+    def get_obj_type(self, obj):
+        return obj["type"]
+
+
+apiv1_handshake_answer_serializer = serializer_factory(APIV1_HandshakeAnswerSchema)
 
 
 class HandshakeResultSchema(BaseSchema):
@@ -137,23 +173,23 @@ class HandshakeResultSchema(BaseSchema):
 handshake_result_serializer = serializer_factory(HandshakeResultSchema)
 
 
-@attr.s
 class ServerHandshake:
     # Class attribute
-    supported_api_versions = frozenset([API_VERSION])
+    SUPPORTED_API_VERSIONS = (API_V2_VERSION, API_V1_VERSION)
 
-    # Challenge
-    challenge_size = attr.ib(default=48)
-    challenge = attr.ib(default=None)
-    answer_type = attr.ib(default=None)
-    answer_data = attr.ib(default=None)
+    def __init__(self, challenge_size: int = 48):
+        # Challenge
+        self.challenge_size = challenge_size
+        self.challenge = None
+        self.answer_type = None
+        self.answer_data = None
 
-    # API version
-    client_api_version = attr.ib(default=None)
-    backend_api_version = attr.ib(default=None)
+        # API version
+        self.client_api_version = None
+        self.backend_api_version = None
 
-    # State
-    state = attr.ib(default="stalled")
+        # State
+        self.state = "stalled"
 
     def is_anonymous(self):
         return self.device_id is None
@@ -169,7 +205,7 @@ class ServerHandshake:
             {
                 "handshake": "challenge",
                 "challenge": self.challenge,
-                "supported_api_versions": self.supported_api_versions,
+                "supported_api_versions": self.SUPPORTED_API_VERSIONS,
             }
         )
 
@@ -177,7 +213,19 @@ class ServerHandshake:
         if not self.state == "challenge":
             raise HandshakeError("Invalid state.")
 
-        data = handshake_answer_serializer.loads(req)
+        # Retrieve the version used by client first
+        data = handshake_answer_version_only_serializer.loads(req)
+        client_api_version = data["client_api_version"]
+        if client_api_version.version == 2:
+            serializer = handshake_answer_serializer
+        elif client_api_version.version == 1:
+            serializer = apiv1_handshake_answer_serializer
+        else:
+            # Imcompatible version !
+            raise HandshakeAPIVersionError(self.SUPPORTED_API_VERSIONS, [client_api_version])
+
+        # Now we know how to deserialize the rest of the data
+        data = serializer.loads(req)
 
         data.pop("handshake")
         self.answer_type = data.pop("type")
@@ -185,9 +233,8 @@ class ServerHandshake:
         self.state = "answer"
 
         # API version matching
-        client_api_versions = frozenset([self.answer_data["client_api_version"]])
         self.backend_api_version, self.client_api_version = _settle_compatible_versions(
-            self.supported_api_versions, client_api_versions
+            self.SUPPORTED_API_VERSIONS, [client_api_version]
         )
 
     def build_bad_protocol_result_req(self, help="Invalid params") -> bytes:
@@ -270,25 +317,20 @@ class ServerHandshake:
         return handshake_result_serializer.dumps({"handshake": "result", "result": "ok"})
 
 
-@attr.s
 class BaseClientHandshake:
-    # Class attribute
-    supported_api_versions = frozenset([API_VERSION])
+    SUPPORTED_API_VERSIONS = None  # Overwritten by subclasses
 
-    # Challenge
-    challenge_data = attr.ib(default=None)
-
-    # API version
-    backend_api_version = attr.ib(default=None)
-    client_api_version = attr.ib(default=None)
+    def __init__(self):
+        self.challenge_data = None
+        self.backend_api_version = None
+        self.client_api_version = None
 
     def load_challenge_req(self, req: bytes):
         self.challenge_data = handshake_challenge_serializer.loads(req)
 
         # API version matching
-        backend_api_versions = frozenset(self.challenge_data["supported_api_versions"])
         self.backend_api_version, self.client_api_version = _settle_compatible_versions(
-            backend_api_versions, self.supported_api_versions
+            self.challenge_data["supported_api_versions"], self.SUPPORTED_API_VERSIONS
         )
 
     def process_result_req(self, req: bytes) -> bytes:
@@ -315,16 +357,20 @@ class BaseClientHandshake:
                 )
 
 
-@attr.s
 class AuthenticatedClientHandshake(BaseClientHandshake):
-    organization_id = attr.ib()
-    device_id = attr.ib()
-    user_signkey = attr.ib()
-    root_verify_key = attr.ib()
+    SUPPORTED_API_VERSIONS = (API_V2_VERSION,)
 
-    challenge_data = attr.ib(default=None)
-    backend_api_version = attr.ib(default=None)
-    client_api_version = attr.ib(default=None)
+    def __init__(
+        self,
+        organization_id: OrganizationID,
+        device_id: DeviceID,
+        user_signkey: SigningKey,
+        root_verify_key: VerifyKey,
+    ):
+        self.organization_id = organization_id
+        self.device_id = device_id
+        self.user_signkey = user_signkey
+        self.root_verify_key = root_verify_key
 
     def process_challenge_req(self, req: bytes) -> bytes:
         self.load_challenge_req(req)
@@ -342,18 +388,45 @@ class AuthenticatedClientHandshake(BaseClientHandshake):
         )
 
 
-@attr.s
-class AnonymousClientHandshake(BaseClientHandshake):
-    organization_id = attr.ib()
-    root_verify_key = attr.ib(default=None)
+class APIV1_AuthenticatedClientHandshake(AuthenticatedClientHandshake):
+    SUPPORTED_API_VERSIONS = (API_V1_VERSION,)
 
-    challenge_data = attr.ib(default=None)
-    backend_api_version = attr.ib(default=None)
-    client_api_version = attr.ib(default=None)
+
+class AnonymousClientHandshake(BaseClientHandshake):
+    SUPPORTED_API_VERSIONS = (API_V2_VERSION,)
+
+    def __init__(self, operation: str, organization_id: OrganizationID, token: str):
+        assert operation in ANONYMOUS_OPERATIONS
+        self.operation = operation
+        self.organization_id = organization_id
+        self.token = token
 
     def process_challenge_req(self, req: bytes) -> bytes:
         self.load_challenge_req(req)
         return handshake_answer_serializer.dumps(
+            {
+                "handshake": "answer",
+                "type": "anonymous",
+                "client_api_version": self.client_api_version,
+                "organization_id": self.organization_id,
+                "operation": self.operation,
+                "token": self.token,
+            }
+        )
+
+
+class APIV1_AnonymousClientHandshake(BaseClientHandshake):
+    SUPPORTED_API_VERSIONS = (API_V1_VERSION,)
+
+    def __init__(
+        self, organization_id: OrganizationID, root_verify_key: Optional[VerifyKey] = None
+    ):
+        self.organization_id = organization_id
+        self.root_verify_key = root_verify_key
+
+    def process_challenge_req(self, req: bytes) -> bytes:
+        self.load_challenge_req(req)
+        return apiv1_handshake_answer_serializer.dumps(
             {
                 "handshake": "answer",
                 "type": "anonymous",
@@ -364,17 +437,15 @@ class AnonymousClientHandshake(BaseClientHandshake):
         )
 
 
-@attr.s
-class AdministrationClientHandshake(BaseClientHandshake):
-    token = attr.ib()
+class APIV1_AdministrationClientHandshake(BaseClientHandshake):
+    SUPPORTED_API_VERSIONS = (API_V1_VERSION,)
 
-    challenge_data = attr.ib(default=None)
-    backend_api_version = attr.ib(default=None)
-    client_api_version = attr.ib(default=None)
+    def __init__(self, token: str):
+        self.token = token
 
     def process_challenge_req(self, req: bytes) -> bytes:
         self.load_challenge_req(req)
-        return handshake_answer_serializer.dumps(
+        return apiv1_handshake_answer_serializer.dumps(
             {
                 "handshake": "answer",
                 "type": "administration",

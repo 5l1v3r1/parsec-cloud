@@ -8,7 +8,11 @@ from parsec.core.backend_connection import (
     BackendConnectionRefused,
     backend_administration_cmds_factory,
 )
-from parsec.api.protocol import ADMINISTRATION_CMDS, AUTHENTICATED_CMDS, ANONYMOUS_CMDS
+from parsec.api.protocol import (
+    APIV1_ADMINISTRATION_CMDS,
+    APIV1_AUTHENTICATED_CMDS,
+    APIV1_ANONYMOUS_CMDS,
+)
 
 
 @pytest.mark.trio
@@ -64,7 +68,9 @@ async def test_administration_cmds_has_right_methods(running_backend):
     async with backend_administration_cmds_factory(
         running_backend.addr, running_backend.backend.config.administration_token
     ) as cmds:
-        for method_name in ADMINISTRATION_CMDS:
+        for method_name in APIV1_ADMINISTRATION_CMDS:
             assert hasattr(cmds, method_name)
-        for method_name in (ANONYMOUS_CMDS | AUTHENTICATED_CMDS) - ADMINISTRATION_CMDS:
+        for method_name in (
+            APIV1_ANONYMOUS_CMDS | APIV1_AUTHENTICATED_CMDS
+        ) - APIV1_ADMINISTRATION_CMDS:
             assert not hasattr(cmds, method_name)

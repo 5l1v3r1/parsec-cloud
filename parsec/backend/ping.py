@@ -2,15 +2,15 @@
 
 from parsec.api.protocol import DeviceID, OrganizationID
 from parsec.api.protocol import ping_serializer
-from parsec.backend.utils import catch_protocol_errors, anonymous_api
+from parsec.backend.utils import catch_protocol_errors, api
 
 
 class BasePingComponent:
-    @anonymous_api
+    @api("ping", auth=("administration", "authenticated", "anonymous"))
     @catch_protocol_errors
     async def api_ping(self, client_ctx, msg):
         msg = ping_serializer.req_load(msg)
-        if hasattr(client_ctx, "organization_id"):
+        if client_ctx.api_auth == "authenticated":
             await self.ping(client_ctx.organization_id, client_ctx.device_id, msg["ping"])
         return ping_serializer.rep_dump({"status": "ok", "pong": msg["ping"]})
 

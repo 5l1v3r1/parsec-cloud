@@ -30,30 +30,33 @@ from parsec.api.protocol.handshake import (
     ServerHandshake,
     AuthenticatedClientHandshake,
     AnonymousClientHandshake,
-    AdministrationClientHandshake,
+    APIV1_AuthenticatedClientHandshake,
+    APIV1_AnonymousClientHandshake,
+    APIV1_AdministrationClientHandshake,
 )
 from parsec.api.protocol.organization import (
-    organization_create_serializer,
+    apiv1_organization_create_serializer,
+    apiv1_organization_bootstrap_serializer,
     organization_bootstrap_serializer,
-    organization_stats_serializer,
-    organization_status_serializer,
-    organization_update_serializer,
+    apiv1_organization_stats_serializer,
+    apiv1_organization_status_serializer,
+    apiv1_organization_update_serializer,
 )
 from parsec.api.protocol.events import events_subscribe_serializer, events_listen_serializer
 from parsec.api.protocol.ping import ping_serializer
 from parsec.api.protocol.user import (
     user_get_serializer,
-    user_find_serializer,
-    user_invite_serializer,
-    user_get_invitation_creator_serializer,
-    user_claim_serializer,
-    user_cancel_invitation_serializer,
+    apiv1_user_find_serializer,
+    apiv1_user_invite_serializer,
+    apiv1_user_get_invitation_creator_serializer,
+    apiv1_user_claim_serializer,
+    apiv1_user_cancel_invitation_serializer,
     user_create_serializer,
     user_revoke_serializer,
-    device_invite_serializer,
-    device_get_invitation_creator_serializer,
-    device_claim_serializer,
-    device_cancel_invitation_serializer,
+    apiv1_device_invite_serializer,
+    apiv1_device_get_invitation_creator_serializer,
+    apiv1_device_claim_serializer,
+    apiv1_device_cancel_invitation_serializer,
     device_create_serializer,
     human_find_serializer,
 )
@@ -80,8 +83,13 @@ from parsec.api.protocol.vlob import (
     vlob_maintenance_get_reencryption_batch_serializer,
     vlob_maintenance_save_reencryption_batch_serializer,
 )
-from parsec.api.protocol.cmds import AUTHENTICATED_CMDS, ANONYMOUS_CMDS, ADMINISTRATION_CMDS
-
+from parsec.api.protocol.cmds import (
+    AUTHENTICATED_CMDS,
+    ANONYMOUS_CMDS,
+    APIV1_AUTHENTICATED_CMDS,
+    APIV1_ANONYMOUS_CMDS,
+    APIV1_ADMINISTRATION_CMDS,
+)
 
 __all__ = (
     "ProtocolError",
@@ -99,7 +107,9 @@ __all__ = (
     "ServerHandshake",
     "AuthenticatedClientHandshake",
     "AnonymousClientHandshake",
-    "AdministrationClientHandshake",
+    "APIV1_AuthenticatedClientHandshake",
+    "APIV1_AnonymousClientHandshake",
+    "APIV1_AdministrationClientHandshake",
     # Types
     "UserID",
     "DeviceID",
@@ -112,11 +122,12 @@ __all__ = (
     "OrganizationIDField",
     "HumanHandleField",
     # Organization
-    "organization_create_serializer",
+    "apiv1_organization_create_serializer",
+    "apiv1_organization_bootstrap_serializer",
     "organization_bootstrap_serializer",
-    "organization_stats_serializer",
-    "organization_status_serializer",
-    "organization_update_serializer",
+    "apiv1_organization_stats_serializer",
+    "apiv1_organization_status_serializer",
+    "apiv1_organization_update_serializer",
     # Events
     "events_subscribe_serializer",
     "events_listen_serializer",
@@ -124,17 +135,17 @@ __all__ = (
     "ping_serializer",
     # User
     "user_get_serializer",
-    "user_find_serializer",
-    "user_invite_serializer",
-    "user_get_invitation_creator_serializer",
-    "user_claim_serializer",
-    "user_cancel_invitation_serializer",
+    "apiv1_user_find_serializer",
+    "apiv1_user_invite_serializer",
+    "apiv1_user_get_invitation_creator_serializer",
+    "apiv1_user_claim_serializer",
+    "apiv1_user_cancel_invitation_serializer",
     "user_create_serializer",
     "user_revoke_serializer",
-    "device_invite_serializer",
-    "device_get_invitation_creator_serializer",
-    "device_claim_serializer",
-    "device_cancel_invitation_serializer",
+    "apiv1_device_invite_serializer",
+    "apiv1_device_get_invitation_creator_serializer",
+    "apiv1_device_claim_serializer",
+    "apiv1_device_cancel_invitation_serializer",
     "device_create_serializer",
     "human_find_serializer",
     # Message
@@ -164,5 +175,7 @@ __all__ = (
     # List of cmds
     "AUTHENTICATED_CMDS",
     "ANONYMOUS_CMDS",
-    "ADMINISTRATION_CMDS",
+    "APIV1_AUTHENTICATED_CMDS",
+    "APIV1_ANONYMOUS_CMDS",
+    "APIV1_ADMINISTRATION_CMDS",
 )

@@ -13,9 +13,9 @@ from parsec.api.protocol import (
     DeviceID,
     ProtocolError,
     HandshakeError,
-    AnonymousClientHandshake,
-    AuthenticatedClientHandshake,
-    AdministrationClientHandshake,
+    APIV1_AnonymousClientHandshake,
+    APIV1_AuthenticatedClientHandshake,
+    APIV1_AdministrationClientHandshake,
 )
 from parsec.core.types import BackendAddr, BackendOrganizationAddr, BackendOrganizationBootstrapAddr
 from parsec.core.backend_connection.exceptions import (
@@ -43,13 +43,13 @@ async def connect(
     if administration_token:
         if not isinstance(addr, BackendAddr):
             raise BackendConnectionError(f"Invalid url format `{addr}`")
-        handshake = AdministrationClientHandshake(administration_token)
+        handshake = APIV1_AdministrationClientHandshake(administration_token)
 
     elif not device_id:
         if isinstance(addr, BackendOrganizationBootstrapAddr):
-            handshake = AnonymousClientHandshake(addr.organization_id)
+            handshake = APIV1_AnonymousClientHandshake(addr.organization_id)
         elif isinstance(addr, BackendOrganizationAddr):
-            handshake = AnonymousClientHandshake(addr.organization_id, addr.root_verify_key)
+            handshake = APIV1_AnonymousClientHandshake(addr.organization_id, addr.root_verify_key)
         else:
             raise BackendConnectionError(
                 f"Invalid url format `{addr}` "
@@ -64,7 +64,7 @@ async def connect(
 
         if not signing_key:
             raise BackendConnectionError(f"Missing signing_key to connect as `{device_id}`")
-        handshake = AuthenticatedClientHandshake(
+        handshake = APIV1_AuthenticatedClientHandshake(
             addr.organization_id, device_id, signing_key, addr.root_verify_key
         )
 

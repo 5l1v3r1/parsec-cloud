@@ -6,19 +6,14 @@ from pendulum import Pendulum
 from parsec.api.protocol import packb, user_get_serializer
 
 from tests.common import freeze_time
-
-
-async def user_get(sock, user_id):
-    await sock.send(user_get_serializer.req_dumps({"cmd": "user_get", "user_id": user_id}))
-    raw_rep = await sock.recv()
-    return user_get_serializer.rep_loads(raw_rep)
+from tests.backend.common import user_get
 
 
 @pytest.fixture
 async def access_testbed(
     backend_factory,
     backend_data_binder_factory,
-    backend_sock_factory,
+    apiv2_backend_sock_factory,
     organization_factory,
     local_device_factory,
 ):
@@ -29,7 +24,7 @@ async def access_testbed(
         with freeze_time("2000-01-01"):
             await binder.bind_organization(org, device)
 
-        async with backend_sock_factory(backend, device) as sock:
+        async with apiv2_backend_sock_factory(backend, device) as sock:
             yield binder, org, device, sock
 
 

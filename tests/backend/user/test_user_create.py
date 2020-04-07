@@ -8,7 +8,7 @@ from parsec.api.data import UserCertificateContent, DeviceCertificateContent
 from parsec.api.protocol import user_create_serializer, DeviceID
 
 from tests.common import freeze_time
-from tests.backend.user.test_user_get import user_get
+from tests.backend.common import user_get
 
 
 async def user_create(sock, **kwargs):
@@ -21,7 +21,7 @@ async def user_create(sock, **kwargs):
 @pytest.mark.trio
 @pytest.mark.parametrize("is_admin", [True, False])
 async def test_user_create_ok(
-    backend, backend_sock_factory, alice_backend_sock, alice, mallory, is_admin
+    backend, apiv2_backend_sock_factory, alice_backend_sock, alice, mallory, is_admin
 ):
     now = pendulum.now()
     user_certificate = UserCertificateContent(
@@ -60,7 +60,7 @@ async def test_user_create_ok(
         )
 
     # Make sure mallory can connect now
-    async with backend_sock_factory(backend, mallory) as sock:
+    async with apiv2_backend_sock_factory(backend, mallory) as sock:
         rep = await user_get(sock, user_id=mallory.user_id)
         assert rep["status"] == "ok"
 

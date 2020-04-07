@@ -13,18 +13,18 @@ from parsec.api.protocol.handshake import (
     HandshakeAPIVersionError,
     ServerHandshake,
     BaseClientHandshake,
-    AuthenticatedClientHandshake,
+    APIV1_AuthenticatedClientHandshake,
     APIV1_AnonymousClientHandshake,
     APIV1_AdministrationClientHandshake,
     HandshakeOrganizationExpired,
 )
-from parsec.api.version import API_V1_VERSION, API_V2_VERSION, ApiVersion
+from parsec.api.version import API_V1_VERSION, ApiVersion
 
 
 def test_good_handshake(alice):
     sh = ServerHandshake()
 
-    ch = AuthenticatedClientHandshake(
+    ch = APIV1_AuthenticatedClientHandshake(
         alice.organization_id, alice.device_id, alice.signing_key, alice.root_verify_key
     )
     assert sh.state == "stalled"
@@ -39,7 +39,7 @@ def test_good_handshake(alice):
     assert sh.answer_type == "authenticated"
     assert sh.answer_data == {
         "answer": ANY,
-        "client_api_version": API_V2_VERSION,
+        "client_api_version": API_V1_VERSION,
         "organization_id": alice.organization_id,
         "device_id": alice.device_id,
         "rvk": alice.root_verify_key,
@@ -48,7 +48,7 @@ def test_good_handshake(alice):
     assert sh.state == "result"
 
     ch.process_result_req(result_req)
-    assert sh.client_api_version == API_V2_VERSION
+    assert sh.client_api_version == API_V1_VERSION
 
 
 @pytest.mark.parametrize("check_rvk", (True, False))
@@ -137,7 +137,7 @@ def test_good_administration_handshake():
     ],
 )
 def test_process_challenge_req_bad_format(alice, req):
-    ch = AuthenticatedClientHandshake(
+    ch = APIV1_AuthenticatedClientHandshake(
         alice.organization_id, alice.device_id, alice.signing_key, alice.root_verify_key
     )
     with pytest.raises(InvalidMessageError):
@@ -168,7 +168,7 @@ def test_process_challenge_req_good_api_version(
     client_version = ApiVersion(*client_version)
     backend_version = ApiVersion(*backend_version)
 
-    ch = AuthenticatedClientHandshake(
+    ch = APIV1_AuthenticatedClientHandshake(
         alice.organization_id, alice.device_id, alice.signing_key, alice.root_verify_key
     )
     req = {
@@ -230,7 +230,7 @@ def test_process_challenge_req_good_multiple_api_version(
     if expected_backend_version:
         expected_backend_version = ApiVersion(*expected_backend_version)
 
-    ch = AuthenticatedClientHandshake(
+    ch = APIV1_AuthenticatedClientHandshake(
         alice.organization_id, alice.device_id, alice.signing_key, alice.root_verify_key
     )
     req = {
