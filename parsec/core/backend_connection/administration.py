@@ -8,7 +8,7 @@ from parsec.core.types import BackendOrganizationAddr
 from parsec.core.backend_connection.transport import connect
 from parsec.core.backend_connection.exceptions import BackendNotAvailable
 from parsec.core.backend_connection.expose_cmds import expose_cmds
-from parsec.api.protocol import ADMINISTRATION_CMDS
+from parsec.api.protocol import APIV1_ADMINISTRATION_CMDS
 
 
 class BackendAdministrationCmds:
@@ -16,7 +16,7 @@ class BackendAdministrationCmds:
         self.addr = addr
         self.acquire_transport = acquire_transport
 
-    for cmd_name in ADMINISTRATION_CMDS:
+    for cmd_name in APIV1_ADMINISTRATION_CMDS:
         vars()[cmd_name] = expose_cmds(cmd_name)
 
 

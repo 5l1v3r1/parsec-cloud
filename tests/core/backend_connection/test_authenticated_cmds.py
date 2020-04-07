@@ -13,7 +13,12 @@ from parsec.core.backend_connection import (
     BackendConnectionRefused,
     backend_authenticated_cmds_factory,
 )
-from parsec.api.protocol import ADMINISTRATION_CMDS, AUTHENTICATED_CMDS, ANONYMOUS_CMDS
+from parsec.api.protocol import (
+    APIV1_HandshakeType,
+    APIV1_ADMINISTRATION_CMDS,
+    APIV1_AUTHENTICATED_CMDS,
+    APIV1_ANONYMOUS_CMDS,
+)
 
 
 @pytest.mark.trio
@@ -62,7 +67,7 @@ async def test_handshake_unknown_device(running_backend, alice, mallory):
             alice.organization_addr, mallory.device_id, mallory.signing_key
         ) as cmds:
             await cmds.ping()
-    assert str(exc.value) == "Unknown Organization or Device"
+    assert str(exc.value) == "Invalid handshake information"
 
 
 @pytest.mark.trio
@@ -77,7 +82,7 @@ async def test_handshake_unknown_organization(running_backend, alice):
             unknown_org_addr, alice.device_id, alice.signing_key
         ) as cmds:
             await cmds.ping()
-    assert str(exc.value) == "Unknown Organization or Device"
+    assert str(exc.value) == "Invalid handshake information"
 
 
 @pytest.mark.trio
@@ -184,7 +189,9 @@ async def test_events_listen_wait_has_watchdog(monkeypatch, mock_clock, running_
     # event that will be returned to the client
     backend_received_cmd = trio.Event()
     backend_client_ctx = None
-    vanilla_api_events_listen = running_backend.backend.logged_cmds["events_listen"]
+    vanilla_api_events_listen = running_backend.backend.apis[APIV1_HandshakeType.AUTHENTICATED][
+        "events_listen"
+    ]
 
     async def _mocked_api_events_listen(client_ctx, msg):
         nonlocal backend_client_ctx
@@ -192,7 +199,9 @@ async def test_events_listen_wait_has_watchdog(monkeypatch, mock_clock, running_
         backend_received_cmd.set()
         return await vanilla_api_events_listen(client_ctx, msg)
 
-    running_backend.backend.logged_cmds["events_listen"] = _mocked_api_events_listen
+    running_backend.backend.apis[APIV1_HandshakeType.AUTHENTICATED][
+        "events_listen"
+    ] = _mocked_api_events_listen
 
     events_listen_rep = None
     async with backend_authenticated_cmds_factory(
@@ -242,7 +251,9 @@ async def test_authenticated_cmds_has_right_methods(running_backend, alice):
     async with backend_authenticated_cmds_factory(
         alice.organization_addr, alice.device_id, alice.signing_key
     ) as cmds:
-        for method_name in AUTHENTICATED_CMDS:
+        for method_name in APIV1_AUTHENTICATED_CMDS:
             assert hasattr(cmds, method_name)
-        for method_name in (ADMINISTRATION_CMDS | ANONYMOUS_CMDS) - AUTHENTICATED_CMDS:
+        for method_name in (
+            APIV1_ADMINISTRATION_CMDS | APIV1_ANONYMOUS_CMDS
+        ) - APIV1_AUTHENTICATED_CMDS:
             assert not hasattr(cmds, method_name)

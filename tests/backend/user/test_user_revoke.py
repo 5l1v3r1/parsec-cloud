@@ -37,9 +37,9 @@ async def user_revoke(sock, **kwargs):
 
 @pytest.mark.trio
 async def test_backend_close_on_user_revoke(
-    backend, alice_backend_sock, backend_sock_factory, bob, bob_revocation_from_alice
+    backend, alice_backend_sock, apiv2_backend_sock_factory, bob, bob_revocation_from_alice
 ):
-    async with backend_sock_factory(
+    async with apiv2_backend_sock_factory(
         backend, bob, freeze_on_transport_error=False
     ) as bob_backend_sock:
         with backend.event_bus.listen() as spy:
@@ -59,7 +59,7 @@ async def test_backend_close_on_user_revoke(
 
 
 @pytest.mark.trio
-async def test_user_revoke_ok(backend, backend_sock_factory, adam_backend_sock, alice, adam):
+async def test_user_revoke_ok(backend, apiv2_backend_sock_factory, adam_backend_sock, alice, adam):
     now = pendulum.Pendulum(2000, 10, 11)
     alice_revocation = RevokedUserCertificateContent(
         author=adam.device_id, timestamp=now, user_id=alice.user_id
@@ -75,20 +75,20 @@ async def test_user_revoke_ok(backend, backend_sock_factory, adam_backend_sock, 
 
     # Alice cannot connect from now on...
     with pytest.raises(HandshakeRevokedDevice):
-        async with backend_sock_factory(backend, alice):
+        async with apiv2_backend_sock_factory(backend, alice):
             pass
 
 
 @pytest.mark.trio
 async def test_user_revoke_not_admin(
-    backend, backend_sock_factory, bob_backend_sock, alice, alice_revocation_from_bob
+    backend, apiv2_backend_sock_factory, bob_backend_sock, alice, alice_revocation_from_bob
 ):
     rep = await user_revoke(bob_backend_sock, revoked_user_certificate=alice_revocation_from_bob)
     assert rep == {"status": "not_allowed", "reason": "User `bob` is not admin"}
 
 
 @pytest.mark.trio
-async def test_cannot_self_revoke(backend, backend_sock_factory, alice_backend_sock, alice):
+async def test_cannot_self_revoke(backend, apiv2_backend_sock_factory, alice_backend_sock, alice):
     now = pendulum.now()
     alice_revocation = RevokedUserCertificateContent(
         author=alice.device_id, timestamp=now, user_id=alice.user_id
@@ -151,7 +151,7 @@ async def test_user_revoke_certify_too_old(backend, alice_backend_sock, alice, b
 
 @pytest.mark.trio
 async def test_user_revoke_other_organization(
-    sock_from_other_organization_factory, backend_sock_factory, backend, alice, bob
+    sock_from_other_organization_factory, apiv2_backend_sock_factory, backend, alice, bob
 ):
     # Organizations should be isolated even for organization admins
     async with sock_from_other_organization_factory(
@@ -166,5 +166,5 @@ async def test_user_revoke_other_organization(
         assert rep == {"status": "not_found"}
 
     # Make sure bob still works
-    async with backend_sock_factory(backend, bob):
+    async with apiv2_backend_sock_factory(backend, bob):
         pass

@@ -27,7 +27,7 @@ async def human_find(sock, query=None, omit_revoked=False, omit_non_human=False,
 async def access_testbed(
     backend_factory,
     backend_data_binder_factory,
-    apiv2_backend_sock_factory,
+    apiv1_backend_sock_factory,
     organization_factory,
     local_device_factory,
 ):
@@ -44,7 +44,7 @@ async def access_testbed(
         with freeze_time("2000-01-01"):
             await binder.bind_organization(org, device)
 
-        async with apiv2_backend_sock_factory(backend, device) as sock:
+        async with apiv1_backend_sock_factory(backend, device) as sock:
 
             yield binder, org, device, sock
 

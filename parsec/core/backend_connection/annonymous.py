@@ -8,7 +8,7 @@ from parsec.core.types import BackendOrganizationAddr
 from parsec.core.backend_connection.transport import connect
 from parsec.core.backend_connection.exceptions import BackendNotAvailable
 from parsec.core.backend_connection.expose_cmds import expose_cmds
-from parsec.api.protocol import ANONYMOUS_CMDS
+from parsec.api.protocol import APIV1_ANONYMOUS_CMDS
 
 
 class BackendAnonymousCmds:
@@ -16,7 +16,7 @@ class BackendAnonymousCmds:
         self.addr = addr
         self.acquire_transport = acquire_transport
 
-    for cmd_name in ANONYMOUS_CMDS:
+    for cmd_name in APIV1_ANONYMOUS_CMDS:
         vars()[cmd_name] = expose_cmds(cmd_name)
 
 

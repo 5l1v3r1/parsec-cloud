@@ -16,7 +16,7 @@ from parsec.core.backend_connection import cmds
 from parsec.core.backend_connection.transport import connect, TransportPool
 from parsec.core.backend_connection.exceptions import BackendNotAvailable, BackendConnectionRefused
 from parsec.core.backend_connection.expose_cmds import expose_cmds_with_retrier
-from parsec.api.protocol import AUTHENTICATED_CMDS
+from parsec.api.protocol import APIV1_AUTHENTICATED_CMDS
 
 
 logger = get_logger()
@@ -30,7 +30,7 @@ class BackendAuthenticatedCmds:
         self.addr = addr
         self.acquire_transport = acquire_transport
 
-    for cmd_name in AUTHENTICATED_CMDS:
+    for cmd_name in APIV1_AUTHENTICATED_CMDS:
         vars()[cmd_name] = expose_cmds_with_retrier(cmd_name)
 
 
