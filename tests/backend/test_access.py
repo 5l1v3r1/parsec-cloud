@@ -34,11 +34,16 @@ async def check_allowed_cmds(backend_sock, cmds):
         assert unpackb(rep)["status"] != "unknown_command"
 
 
-# TODO
-# @pytest.mark.trio
-# async def test_anonymous_has_limited_access(anonymous_backend_sock):
-#     await check_forbidden_cmds(anonymous_backend_sock, AUTHENTICATED_CMDS - ANONYMOUS_CMDS)
-#     await check_allowed_cmds(anonymous_backend_sock, ANONYMOUS_CMDS)
+@pytest.mark.trio
+async def test_anonymous_has_limited_access(backend, apiv2_backend_anonymous_sock_factory, coolorg):
+    async with apiv2_backend_anonymous_sock_factory(
+        backend,
+        organization_id=coolorg.organization_id,
+        operation="bootstrap_organization",
+        token="123abc",
+    ) as sock:
+        await check_forbidden_cmds(sock, AUTHENTICATED_CMDS - ANONYMOUS_CMDS)
+        await check_allowed_cmds(sock, ANONYMOUS_CMDS)
 
 
 @pytest.mark.trio

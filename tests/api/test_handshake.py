@@ -3,6 +3,7 @@
 import pytest
 from unittest.mock import ANY
 
+from parsec.api.protocol.types import OrganizationID
 from parsec.api.protocol.base import packb, unpackb, InvalidMessageError
 from parsec.api.protocol.handshake import (
     HandshakeFailedChallenge,
@@ -14,14 +15,13 @@ from parsec.api.protocol.handshake import (
     ServerHandshake,
     BaseClientHandshake,
     AuthenticatedClientHandshake,
-    APIV1_AnonymousClientHandshake,
-    APIV1_AdministrationClientHandshake,
+    AnonymousClientHandshake,
     HandshakeOrganizationExpired,
 )
-from parsec.api.version import API_V1_VERSION, API_V2_VERSION, ApiVersion
+from parsec.api.version import API_V2_VERSION, ApiVersion
 
 
-def test_good_handshake(alice):
+def test_good_authenticated_handshake(alice):
     sh = ServerHandshake()
 
     ch = AuthenticatedClientHandshake(
@@ -51,14 +51,13 @@ def test_good_handshake(alice):
     assert sh.client_api_version == API_V2_VERSION
 
 
-@pytest.mark.parametrize("check_rvk", (True, False))
-def test_good_anonymous_handshake(coolorg, check_rvk):
-    sh = ServerHandshake()
+@pytest.mark.parametrize("operation", ("bootstrap_organization", "claim_user", "claim_device"))
+def test_good_anonymous_handshake(coolorg, operation):
+    organization_id = OrganizationID("Org")
+    token = "123abc"
 
-    if check_rvk:
-        ch = APIV1_AnonymousClientHandshake(coolorg.organization_id, coolorg.root_verify_key)
-    else:
-        ch = APIV1_AnonymousClientHandshake(coolorg.organization_id)
+    sh = ServerHandshake()
+    ch = AnonymousClientHandshake(organization_id=organization_id, operation=operation, token=token)
     assert sh.state == "stalled"
 
     challenge_req = sh.build_challenge_req()
@@ -69,46 +68,18 @@ def test_good_anonymous_handshake(coolorg, check_rvk):
     sh.process_answer_req(answer_req)
     assert sh.state == "answer"
     assert sh.answer_type == "anonymous"
-    if check_rvk:
-        assert sh.answer_data == {
-            "client_api_version": API_V1_VERSION,
-            "organization_id": coolorg.organization_id,
-            "rvk": coolorg.root_verify_key,
-        }
-    else:
-        assert sh.answer_data == {
-            "client_api_version": API_V1_VERSION,
-            "organization_id": coolorg.organization_id,
-            "rvk": None,
-        }
+    assert sh.answer_data == {
+        "client_api_version": API_V2_VERSION,
+        "organization_id": organization_id,
+        "operation": operation,
+        "token": token,
+    }
+
     result_req = sh.build_result_req()
     assert sh.state == "result"
 
     ch.process_result_req(result_req)
-    assert sh.client_api_version == API_V1_VERSION
-
-
-def test_good_administration_handshake():
-    admin_token = "Xx" * 16
-    sh = ServerHandshake()
-
-    ch = APIV1_AdministrationClientHandshake(admin_token)
-    assert sh.state == "stalled"
-
-    challenge_req = sh.build_challenge_req()
-    assert sh.state == "challenge"
-
-    answer_req = ch.process_challenge_req(challenge_req)
-
-    sh.process_answer_req(answer_req)
-    assert sh.state == "answer"
-    assert sh.answer_type == "administration"
-    assert sh.answer_data == {"client_api_version": API_V1_VERSION, "token": admin_token}
-    result_req = sh.build_result_req()
-    assert sh.state == "result"
-
-    ch.process_result_req(result_req)
-    assert sh.client_api_version == API_V1_VERSION
+    assert sh.client_api_version == API_V2_VERSION
 
 
 # 1) Server build challenge (nothing more to test...)
@@ -124,14 +95,14 @@ def test_good_administration_handshake():
         {
             "handshake": "foo",
             "challenge": b"1234567890",
-            "supported_api_versions": [API_V1_VERSION],
+            "supported_api_versions": [API_V2_VERSION],
         },
         {"handshake": "challenge", "challenge": b"1234567890"},
         {"challenge": b"1234567890"},
-        {"challenge": b"1234567890", "supported_api_versions": [API_V1_VERSION]},
+        {"challenge": b"1234567890", "supported_api_versions": [API_V2_VERSION]},
         {"handshake": "challenge", "challenge": None},
-        {"handshake": "challenge", "challenge": None, "supported_api_versions": [API_V1_VERSION]},
-        {"handshake": "challenge", "challenge": 42, "supported_api_versions": [API_V1_VERSION]},
+        {"handshake": "challenge", "challenge": None, "supported_api_versions": [API_V2_VERSION]},
+        {"handshake": "challenge", "challenge": 42, "supported_api_versions": [API_V2_VERSION]},
         {"handshake": "challenge", "challenge": b"1234567890"},
         {"handshake": "challenge", "challenge": b"1234567890", "supported_api_versions": "invalid"},
     ],
@@ -178,20 +149,19 @@ def test_process_challenge_req_good_api_version(
     }
     monkeypatch.setattr(ch, "SUPPORTED_API_VERSIONS", [client_version])
 
-    # Invalid versioning
     if not valid:
+        # Invalid versioning
         with pytest.raises(HandshakeAPIVersionError) as context:
             ch.process_challenge_req(packb(req))
         assert context.value.client_versions == [client_version]
         assert context.value.backend_versions == [backend_version]
-        return
 
-    # Valid versioning
-    ch.process_challenge_req(packb(req))
-    assert ch.SUPPORTED_API_VERSIONS == [client_version]
-    assert ch.challenge_data["supported_api_versions"] == [backend_version]
-    assert ch.backend_api_version == backend_version
-    assert ch.client_api_version == client_version
+    else:
+        # Valid versioning
+        ch.process_challenge_req(packb(req))
+        assert ch.challenge_data["supported_api_versions"] == [backend_version]
+        assert ch.backend_api_version == backend_version
+        assert ch.client_api_version == client_version
 
 
 @pytest.mark.parametrize(
@@ -240,20 +210,19 @@ def test_process_challenge_req_good_multiple_api_version(
     }
     monkeypatch.setattr(ch, "SUPPORTED_API_VERSIONS", client_versions)
 
-    # Invalid versioning
     if expected_client_version is None:
+        # Invalid versioning
         with pytest.raises(HandshakeAPIVersionError) as context:
             ch.process_challenge_req(packb(req))
         assert context.value.client_versions == client_versions
         assert context.value.backend_versions == backend_versions
-        return
 
-    # Valid versioning
-    ch.process_challenge_req(packb(req))
-    assert ch.SUPPORTED_API_VERSIONS == client_versions
-    assert ch.challenge_data["supported_api_versions"] == list(backend_versions)
-    assert ch.backend_api_version == expected_backend_version
-    assert ch.client_api_version == expected_client_version
+    else:
+        # Valid versioning
+        ch.process_challenge_req(packb(req))
+        assert ch.challenge_data["supported_api_versions"] == list(backend_versions)
+        assert ch.backend_api_version == expected_backend_version
+        assert ch.client_api_version == expected_client_version
 
 
 # 3) Server process answer
@@ -327,32 +296,30 @@ def test_process_challenge_req_good_multiple_api_version(
             "handshake": "answer",
             "type": "anonymous",
             "organization_id": "<good>",
-            "rvk": b"dummy",  # Invalid VerifyKey
+            "operation": b"dummy",  # Invalid operation
+            "token": "123abc",
         },
         {
             "handshake": "answer",
             "type": "anonymous",
+            "operation": "bootstrap_organization",
             "organization_id": "d@mmy",  # Invalid OrganizationID
-            "rvk": "<good>",
+            "token": "123abc",
         },
         {
             "handshake": "answer",
             "type": "anonymous",
+            "operation": "bootstrap_organization",
             "organization_id": "<good>",
-            "rvk": "<good>",
-            "dummy": "whatever",  # Unknown field
-        },
-        # Admin answer
-        {
-            "handshake": "answer",
-            "type": "administration",
-            # Missing token
+            "token": 42,  # Invalid token
         },
         {
             "handshake": "answer",
-            "type": "administration",
-            "token": "<good>",
-            "dummy": "whatever",  # Unknown field
+            "type": "anonymous",
+            "operation": "bootstrap_organization",
+            "organization_id": "<good>",
+            "token": "123abc",
+            "dummy": "whatever",  # Unknown field TODO: useful ?
         },
     ],
 )
@@ -364,7 +331,7 @@ def test_process_answer_req_bad_format(req, alice):
     ]:
         if req.get(key) == "<good>":
             req[key] = good_value
-    req["supported_api_versions"] = [API_V1_VERSION]
+    req["supported_api_versions"] = [API_V2_VERSION]
     sh = ServerHandshake()
     sh.build_challenge_req()
     with pytest.raises(InvalidMessageError):
@@ -380,7 +347,7 @@ def test_build_result_req_bad_key(alice, bob):
     answer = {
         "handshake": "answer",
         "type": "authenticated",
-        "client_api_version": API_V1_VERSION,
+        "client_api_version": API_V2_VERSION,
         "organization_id": alice.organization_id,
         "device_id": alice.device_id,
         "rvk": alice.root_verify_key.encode(),
@@ -397,7 +364,7 @@ def test_build_result_req_bad_challenge(alice):
     answer = {
         "handshake": "answer",
         "type": "authenticated",
-        "client_api_version": API_V1_VERSION,
+        "client_api_version": API_V2_VERSION,
         "organization_id": alice.organization_id,
         "device_id": alice.device_id,
         "rvk": alice.root_verify_key.encode(),
@@ -425,7 +392,7 @@ def test_build_bad_outcomes(alice, method, expected_result):
     answer = {
         "handshake": "answer",
         "type": "authenticated",
-        "client_api_version": API_V1_VERSION,
+        "client_api_version": API_V2_VERSION,
         "organization_id": alice.organization_id,
         "device_id": alice.device_id,
         "rvk": alice.root_verify_key.encode(),

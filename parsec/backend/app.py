@@ -128,15 +128,18 @@ class APIV1_AnonymousClientContext(BaseClientContext):
         )
 
     def __repr__(self):
-        return f"AnonymousClientContext(conn={self.conn_id}, org={self.organization_id})"
+        return f"APIV1_AnonymousClientContext(conn={self.conn_id}, org={self.organization_id})"
 
 
 class AnonymousClientContext(BaseClientContext):
-    __slots__ = ("organization_id", "token", "conn_id", "logger")
+    __slots__ = ("organization_id", "operation", "token", "conn_id", "logger")
 
-    def __init__(self, transport: Transport, organization_id: OrganizationID, token: str):
+    def __init__(
+        self, transport: Transport, organization_id: OrganizationID, operation: str, token: str
+    ):
         super().__init__(transport)
         self.organization_id = organization_id
+        self.operation = operation
         self.token = token
 
         self.conn_id = self.transport.conn_id
@@ -159,6 +162,9 @@ class APIV1_AdministrationClientContext(BaseClientContext):
             client_id="<administration>"
         )
 
+    def __repr__(self):
+        return f"APIV1_AdministrationClientContext(conn={self.conn_id})"
+
 
 def _filter_binary_fields(data):
     return {k: v if not isinstance(v, bytes) else b"[...]" for k, v in data.items()}
@@ -178,6 +184,7 @@ async def backend_app_factory(config: BackendConfig, event_bus: Optional[EventBu
             config=config,
             event_bus=event_bus,
             user=components["user"],
+            invite=components["invite"],
             organization=components["organization"],
             message=components["message"],
             realm=components["realm"],
@@ -195,6 +202,7 @@ class BackendApp:
         config,
         event_bus,
         user,
+        invite,
         organization,
         message,
         realm,
@@ -206,7 +214,9 @@ class BackendApp:
     ):
         self.config = config
         self.event_bus = event_bus
+
         self.user = user
+        self.invite = invite
         self.organization = organization
         self.message = message
         self.realm = realm
@@ -216,7 +226,9 @@ class BackendApp:
         self.block = block
         self.events = events
 
-        self.apis = collect_apis(block, events, message, organization, ping, realm, vlob, user)
+        self.apis = collect_apis(
+            user, invite, organization, message, realm, vlob, ping, blockstore, block, events
+        )
 
     async def _do_handshake(self, transport):
         context = None
@@ -331,8 +343,8 @@ class BackendApp:
                     else:  # v2
                         context = AnonymousClientContext(
                             transport,
-                            operation=handshake.answer_data["operation"],
                             organization_id=organization_id,
+                            operation=handshake.answer_data["operation"],
                             token=handshake.answer_data["token"],
                         )
                         result_req = handshake.build_result_req()

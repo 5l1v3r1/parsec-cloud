@@ -12,17 +12,16 @@ AUTHENTICATED_CMDS = {
     "user_create",
     "user_revoke",
     "device_create",
-    # TODO: implement this
-    # # Invitation
-    # "invite_new",
-    # "invite_delete",
-    # "invite_list",
-    # "invite_1_wait_peer",
-    # "invite_2_get_hashed_nonce",
-    # "invite_2_send_nonce",
-    # "invite_3_wait_peer_trust",
-    # "invite_3_signify_trust",
-    # "invite_4_communicate",
+    # Invitation
+    "invite_new",
+    "invite_delete",
+    "invite_list",
+    "invite_1_wait_peer",
+    "invite_2_get_hashed_nonce",
+    "invite_2_send_nonce",
+    "invite_3_wait_peer_trust",
+    "invite_3_signify_trust",
+    "invite_4_communicate",
     # Block
     "block_create",
     "block_read",
@@ -45,14 +44,13 @@ AUTHENTICATED_CMDS = {
 ANONYMOUS_CMDS = {
     "ping",  # TODO: remove ping and ping event (only have them in tests)
     "organization_bootstrap",
-    # TODO: implement this
-    # "invite_info",
-    # "invite_1_wait_peer",
-    # "invite_2_send_hash_nonce",
-    # "invite_2_send_nonce",
-    # "invite_3_wait_peer_trust",
-    # "invite_3_signify_trust",
-    # "invite_4_communicate",
+    "invite_info",
+    "invite_1_wait_peer",
+    "invite_2_send_hash_nonce",
+    "invite_2_send_nonce",
+    "invite_3_wait_peer_trust",
+    "invite_3_signify_trust",
+    "invite_4_communicate",
 }
 
 # TODO: remove me once API v1 is deprecated

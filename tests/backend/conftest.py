@@ -173,12 +173,12 @@ async def bob_backend_sock(apiv2_backend_sock_factory, backend, bob):
 
 
 @pytest.fixture
-def apiv2_backend_anonymous_sock_factory(backend_raw_transport_factory, coolorg):
+def apiv2_backend_anonymous_sock_factory(backend_raw_transport_factory):
     @asynccontextmanager
     async def _backend_sock_factory(
         backend,
-        operation: str,
         organization_id: OrganizationID,
+        operation: str,
         token: str,
         freeze_on_transport_error: bool = True,
     ):
@@ -186,7 +186,7 @@ def apiv2_backend_anonymous_sock_factory(backend_raw_transport_factory, coolorg)
             backend, freeze_on_transport_error=freeze_on_transport_error
         ) as transport:
             ch = AnonymousClientHandshake(
-                operation=operation, organization_id=organization_id, token=token
+                organization_id=organization_id, operation=operation, token=token
             )
             challenge_req = await transport.recv()
             answer_req = ch.process_challenge_req(challenge_req)

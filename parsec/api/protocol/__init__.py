@@ -60,6 +60,19 @@ from parsec.api.protocol.user import (
     device_create_serializer,
     human_find_serializer,
 )
+from parsec.api.protocol.invite import (
+    invite_new_serializer,
+    invite_delete_serializer,
+    invite_list_serializer,
+    invite_info_serializer,
+    invite_1_wait_peer_serializer,
+    invite_2_send_hash_nonce_serializer,
+    invite_2_get_hashed_nonce_serializer,
+    invite_2_send_nonce_serializer,
+    invite_3_wait_peer_trust_serializer,
+    invite_3_signify_trust_serializer,
+    invite_4_communicate_serializer,
+)
 from parsec.api.protocol.message import message_get_serializer
 from parsec.api.protocol.realm import (
     RealmRole,
@@ -148,6 +161,18 @@ __all__ = (
     "apiv1_device_cancel_invitation_serializer",
     "device_create_serializer",
     "human_find_serializer",
+    # Invite
+    "invite_new_serializer",
+    "invite_delete_serializer",
+    "invite_list_serializer",
+    "invite_info_serializer",
+    "invite_1_wait_peer_serializer",
+    "invite_2_send_hash_nonce_serializer",
+    "invite_2_get_hashed_nonce_serializer",
+    "invite_2_send_nonce_serializer",
+    "invite_3_wait_peer_trust_serializer",
+    "invite_3_signify_trust_serializer",
+    "invite_4_communicate_serializer",
     # Message
     "message_get_serializer",
     # Data group

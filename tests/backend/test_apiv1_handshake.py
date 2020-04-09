@@ -6,7 +6,7 @@ from parsec.api.protocol import packb, unpackb
 from parsec.api.transport import Transport
 from parsec.api.protocol.handshake import (
     ServerHandshake,
-    AuthenticatedClientHandshake,
+    APIV1_AuthenticatedClientHandshake,
     APIV1_AnonymousClientHandshake,
     APIV1_AdministrationClientHandshake,
     HandshakeRVKMismatch,
@@ -26,7 +26,7 @@ def mock_api_versions(monkeypatch):
     def _mock_api_versions(client_versions=None, backend_versions=None):
         if client_versions is not None:
             monkeypatch.setattr(
-                AuthenticatedClientHandshake, "SUPPORTED_API_VERSIONS", client_versions
+                APIV1_AuthenticatedClientHandshake, "SUPPORTED_API_VERSIONS", client_versions
             )
             monkeypatch.setattr(
                 APIV1_AnonymousClientHandshake, "SUPPORTED_API_VERSIONS", client_versions
@@ -53,7 +53,7 @@ async def test_anonymous_handshake_invalid_format(backend, server_factory):
 
         await transport.recv()  # Get challenge
         req = {
-            "handshake": ",foo",
+            "handshake": "foo",
             "type": "anonymous",
             "client_api_version": ApiVersion(1, 1),
             "organization_id": "zob",
@@ -69,7 +69,7 @@ async def test_anonymous_handshake_invalid_format(backend, server_factory):
 
 @pytest.mark.trio
 async def test_authenticated_handshake_good(backend, server_factory, alice, mock_api_versions):
-    ch = AuthenticatedClientHandshake(
+    ch = APIV1_AuthenticatedClientHandshake(
         alice.organization_id, alice.device_id, alice.signing_key, alice.root_verify_key
     )
 
@@ -107,7 +107,7 @@ async def test_administration_handshake_good(backend, server_factory, mock_api_v
 
 
 @pytest.mark.trio
-async def test_admin_handshake_bad_token(backend, server_factory):
+async def test_administration_handshake_bad_token(backend, server_factory):
     ch = APIV1_AdministrationClientHandshake("dummy token")
     async with server_factory(backend.handle_client) as server:
         stream = server.connection_factory()
@@ -128,7 +128,7 @@ async def test_handshake_bad_rvk(backend, server_factory, coolorg, alice, othero
     if is_anonymous:
         ch = APIV1_AnonymousClientHandshake(coolorg.organization_id, otherorg.root_verify_key)
     else:
-        ch = AuthenticatedClientHandshake(
+        ch = APIV1_AuthenticatedClientHandshake(
             alice.organization_id, alice.device_id, alice.signing_key, otherorg.root_verify_key
         )
     async with server_factory(backend.handle_client) as server:
@@ -184,14 +184,14 @@ async def test_anonymous_handshake_bad_rvk(backend, server_factory, coolorg, oth
 
 @pytest.mark.trio
 @pytest.mark.parametrize("type", ["anonymous", "authenticated"])
-async def test_anonymous_handshake_unknown_organization(
+async def test_handshake_unknown_organization(
     backend, server_factory, organization_factory, alice, type
 ):
     bad_org = organization_factory()
     if type == "anonymous":
         ch = APIV1_AnonymousClientHandshake(bad_org.organization_id, bad_org.root_verify_key)
     else:  # authenticated
-        ch = AuthenticatedClientHandshake(
+        ch = APIV1_AuthenticatedClientHandshake(
             bad_org.organization_id, alice.device_id, alice.signing_key, bad_org.root_verify_key
         )
 
@@ -209,8 +209,10 @@ async def test_anonymous_handshake_unknown_organization(
 
 
 @pytest.mark.trio
-async def test_anonymous_handshake_expired_organization(backend, server_factory, expiredorg, alice):
-    ch = AuthenticatedClientHandshake(
+async def test_authenticated_handshake_expired_organization(
+    backend, server_factory, expiredorg, alice
+):
+    ch = APIV1_AuthenticatedClientHandshake(
         expiredorg.organization_id, alice.device_id, alice.signing_key, expiredorg.root_verify_key
     )
 
@@ -229,7 +231,7 @@ async def test_anonymous_handshake_expired_organization(backend, server_factory,
 
 @pytest.mark.trio
 async def test_authenticated_handshake_unknown_device(backend, server_factory, mallory):
-    ch = AuthenticatedClientHandshake(
+    ch = APIV1_AuthenticatedClientHandshake(
         mallory.organization_id, mallory.device_id, mallory.signing_key, mallory.root_verify_key
     )
     async with server_factory(backend.handle_client) as server:
@@ -249,7 +251,7 @@ async def test_authenticated_handshake_unknown_device(backend, server_factory, m
 async def test_authenticated_handshake_bad_versions(
     backend, server_factory, alice, mock_api_versions
 ):
-    ch = AuthenticatedClientHandshake(
+    ch = APIV1_AuthenticatedClientHandshake(
         alice.organization_id, alice.device_id, alice.signing_key, alice.root_verify_key
     )
 

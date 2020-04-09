@@ -395,10 +395,10 @@ class APIV1_AuthenticatedClientHandshake(AuthenticatedClientHandshake):
 class AnonymousClientHandshake(BaseClientHandshake):
     SUPPORTED_API_VERSIONS = (API_V2_VERSION,)
 
-    def __init__(self, operation: str, organization_id: OrganizationID, token: str):
+    def __init__(self, organization_id: OrganizationID, operation: str, token: str):
         assert operation in ANONYMOUS_OPERATIONS
-        self.operation = operation
         self.organization_id = organization_id
+        self.operation = operation
         self.token = token
 
     def process_challenge_req(self, req: bytes) -> bytes:
