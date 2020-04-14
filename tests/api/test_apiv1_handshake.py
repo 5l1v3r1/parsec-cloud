@@ -16,6 +16,7 @@ from parsec.api.protocol.handshake import (
     APIV1_AuthenticatedClientHandshake,
     APIV1_AnonymousClientHandshake,
     APIV1_AdministrationClientHandshake,
+    APIV1_HandshakeType,
     HandshakeOrganizationExpired,
 )
 from parsec.api.version import API_V1_VERSION, ApiVersion
@@ -36,7 +37,7 @@ def test_good_handshake(alice):
 
     sh.process_answer_req(answer_req)
     assert sh.state == "answer"
-    assert sh.answer_type == "authenticated"
+    assert sh.answer_type == APIV1_HandshakeType.AUTHENTICATED
     assert sh.answer_data == {
         "answer": ANY,
         "client_api_version": API_V1_VERSION,
@@ -68,7 +69,7 @@ def test_good_anonymous_handshake(coolorg, check_rvk):
 
     sh.process_answer_req(answer_req)
     assert sh.state == "answer"
-    assert sh.answer_type == "anonymous"
+    assert sh.answer_type == APIV1_HandshakeType.ANONYMOUS
     if check_rvk:
         assert sh.answer_data == {
             "client_api_version": API_V1_VERSION,
@@ -102,7 +103,7 @@ def test_good_administration_handshake():
 
     sh.process_answer_req(answer_req)
     assert sh.state == "answer"
-    assert sh.answer_type == "administration"
+    assert sh.answer_type == APIV1_HandshakeType.ADMINISTRATION
     assert sh.answer_data == {"client_api_version": API_V1_VERSION, "token": admin_token}
     result_req = sh.build_result_req()
     assert sh.state == "result"
@@ -267,7 +268,7 @@ def test_process_challenge_req_good_multiple_api_version(
         # Authenticated answer
         {
             "handshake": "answer",
-            "type": "authenticated",
+            "type": APIV1_HandshakeType.AUTHENTICATED.value,
             "organization_id": "<good>",
             "device_id": "<good>",
             # Missing rvk
@@ -275,7 +276,7 @@ def test_process_challenge_req_good_multiple_api_version(
         },
         {
             "handshake": "answer",
-            "type": "authenticated",
+            "type": APIV1_HandshakeType.AUTHENTICATED.value,
             "organization_id": "<good>",
             # Missing device_id
             "rvk": "<good>",
@@ -283,7 +284,7 @@ def test_process_challenge_req_good_multiple_api_version(
         },
         {
             "handshake": "answer",
-            "type": "authenticated",
+            "type": APIV1_HandshakeType.AUTHENTICATED.value,
             "organization_id": "<good>",
             "device_id": "<good>",
             "rvk": "<good>",
@@ -291,7 +292,7 @@ def test_process_challenge_req_good_multiple_api_version(
         },
         {
             "handshake": "answer",
-            "type": "authenticated",
+            "type": APIV1_HandshakeType.AUTHENTICATED.value,
             "organization_id": "<good>",
             "device_id": "<good>",
             "rvk": "<good>",
@@ -299,16 +300,7 @@ def test_process_challenge_req_good_multiple_api_version(
         },
         {
             "handshake": "answer",
-            "type": "authenticated",
-            "organization_id": "<good>",
-            "device_id": "<good>",
-            "rvk": "<good>",
-            "answer": b"good answer",
-            "foo": "bar",  # Unknown field
-        },
-        {
-            "handshake": "answer",
-            "type": "authenticated",
+            "type": APIV1_HandshakeType.AUTHENTICATED.value,
             "organization_id": "<good>",
             "device_id": "dummy",  # Invalid DeviceID
             "rvk": "<good>",
@@ -316,7 +308,7 @@ def test_process_challenge_req_good_multiple_api_version(
         },
         {
             "handshake": "answer",
-            "type": "authenticated",
+            "type": APIV1_HandshakeType.AUTHENTICATED.value,
             "organization_id": "<good>",
             "device_id": "<good>",
             "rvk": b"dummy",  # Invalid VerifyKey
@@ -325,34 +317,21 @@ def test_process_challenge_req_good_multiple_api_version(
         # Anonymous answer
         {
             "handshake": "answer",
-            "type": "anonymous",
+            "type": APIV1_HandshakeType.ANONYMOUS.value,
             "organization_id": "<good>",
             "rvk": b"dummy",  # Invalid VerifyKey
         },
         {
             "handshake": "answer",
-            "type": "anonymous",
+            "type": APIV1_HandshakeType.ANONYMOUS.value,
             "organization_id": "d@mmy",  # Invalid OrganizationID
             "rvk": "<good>",
-        },
-        {
-            "handshake": "answer",
-            "type": "anonymous",
-            "organization_id": "<good>",
-            "rvk": "<good>",
-            "dummy": "whatever",  # Unknown field
         },
         # Admin answer
         {
             "handshake": "answer",
-            "type": "administration",
+            "type": APIV1_HandshakeType.ADMINISTRATION.value,
             # Missing token
-        },
-        {
-            "handshake": "answer",
-            "type": "administration",
-            "token": "<good>",
-            "dummy": "whatever",  # Unknown field
         },
     ],
 )
@@ -364,7 +343,7 @@ def test_process_answer_req_bad_format(req, alice):
     ]:
         if req.get(key) == "<good>":
             req[key] = good_value
-    req["supported_api_versions"] = [API_V1_VERSION]
+    req["client_api_version"] = API_V1_VERSION
     sh = ServerHandshake()
     sh.build_challenge_req()
     with pytest.raises(InvalidMessageError):

@@ -11,6 +11,7 @@ from parsec.utils import timestamps_in_the_ballpark
 from parsec.crypto import VerifyKey
 from parsec.api.protocol import (
     OrganizationID,
+    APIV1_HandshakeType,
     apiv1_organization_create_serializer,
     organization_bootstrap_serializer,
     apiv1_organization_bootstrap_serializer,
@@ -79,7 +80,7 @@ class BaseOrganizationComponent:
     def __init__(self, bootstrap_token_size: int = 32):
         self.bootstrap_token_size = bootstrap_token_size
 
-    @api("organization_create", version=1, auth="administration")
+    @api("organization_create", handshake_types=[APIV1_HandshakeType.ADMINISTRATION])
     @catch_protocol_errors
     async def api_organization_create(self, client_ctx, msg):
         msg = apiv1_organization_create_serializer.req_load(msg)
@@ -102,7 +103,7 @@ class BaseOrganizationComponent:
 
         return apiv1_organization_create_serializer.rep_dump(rep)
 
-    @api("organization_status", version=1, auth="administration")
+    @api("organization_status", handshake_types=[APIV1_HandshakeType.ADMINISTRATION])
     @catch_protocol_errors
     async def api_organization_status(self, client_ctx, msg):
         msg = apiv1_organization_status_serializer.req_load(msg)
@@ -121,7 +122,7 @@ class BaseOrganizationComponent:
             }
         )
 
-    @api("organization_stats", version=1, auth="administration")
+    @api("organization_stats", handshake_types=[APIV1_HandshakeType.ADMINISTRATION])
     @catch_protocol_errors
     async def api_organization_stats(self, client_ctx, msg):
         msg = apiv1_organization_stats_serializer.req_load(msg)
@@ -141,7 +142,7 @@ class BaseOrganizationComponent:
             }
         )
 
-    @api("organization_update", version=1, auth="administration")
+    @api("organization_update", handshake_types=[APIV1_HandshakeType.ADMINISTRATION])
     @catch_protocol_errors
     async def api_organization_update(self, client_ctx, msg):
         msg = apiv1_organization_update_serializer.req_load(msg)
@@ -156,16 +157,11 @@ class BaseOrganizationComponent:
 
         return apiv1_organization_update_serializer.rep_dump({"status": "ok"})
 
-    @api("organization_bootstrap", auth="anonymous")
+    @api("organization_bootstrap", handshake_types=[APIV1_HandshakeType.ANONYMOUS])
     @catch_protocol_errors
     async def api_organization_bootstrap(self, client_ctx, msg):
-        if client_ctx.api_version.version == 1:
-            msg = apiv1_organization_bootstrap_serializer.req_load(msg)
-            bootstrap_token = msg["bootstrap_token"]
-        else:  # v2
-            msg = organization_bootstrap_serializer.req_load(msg)
-            bootstrap_token = client_ctx.token
-
+        msg = apiv1_organization_bootstrap_serializer.req_load(msg)
+        bootstrap_token = msg["bootstrap_token"]
         root_verify_key = msg["root_verify_key"]
 
         try:

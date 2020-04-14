@@ -2,6 +2,7 @@
 
 import pytest
 from unittest.mock import ANY
+from uuid import uuid4
 
 from parsec.api.protocol.types import OrganizationID
 from parsec.api.protocol.base import packb, unpackb, InvalidMessageError
@@ -12,10 +13,12 @@ from parsec.api.protocol.handshake import (
     HandshakeRVKMismatch,
     HandshakeRevokedDevice,
     HandshakeAPIVersionError,
+    HandshakeType,
+    HandshakeInvitedOperation,
     ServerHandshake,
     BaseClientHandshake,
     AuthenticatedClientHandshake,
-    AnonymousClientHandshake,
+    InvitedClientHandshake,
     HandshakeOrganizationExpired,
 )
 from parsec.api.version import API_V2_VERSION, ApiVersion
@@ -36,7 +39,7 @@ def test_good_authenticated_handshake(alice):
 
     sh.process_answer_req(answer_req)
     assert sh.state == "answer"
-    assert sh.answer_type == "authenticated"
+    assert sh.answer_type == HandshakeType.AUTHENTICATED
     assert sh.answer_data == {
         "answer": ANY,
         "client_api_version": API_V2_VERSION,
@@ -51,13 +54,15 @@ def test_good_authenticated_handshake(alice):
     assert sh.client_api_version == API_V2_VERSION
 
 
-@pytest.mark.parametrize("operation", ("bootstrap_organization", "claim_user", "claim_device"))
-def test_good_anonymous_handshake(coolorg, operation):
+@pytest.mark.parametrize(
+    "operation", (HandshakeInvitedOperation.CLAIM_USER, HandshakeInvitedOperation.CLAIM_DEVICE)
+)
+def test_good_invited_handshake(coolorg, operation):
     organization_id = OrganizationID("Org")
-    token = "123abc"
+    token = uuid4()
 
     sh = ServerHandshake()
-    ch = AnonymousClientHandshake(organization_id=organization_id, operation=operation, token=token)
+    ch = InvitedClientHandshake(organization_id=organization_id, operation=operation, token=token)
     assert sh.state == "stalled"
 
     challenge_req = sh.build_challenge_req()
@@ -67,7 +72,7 @@ def test_good_anonymous_handshake(coolorg, operation):
 
     sh.process_answer_req(answer_req)
     assert sh.state == "answer"
-    assert sh.answer_type == "anonymous"
+    assert sh.answer_type == HandshakeType.INVITED
     assert sh.answer_data == {
         "client_api_version": API_V2_VERSION,
         "organization_id": organization_id,
@@ -236,7 +241,7 @@ def test_process_challenge_req_good_multiple_api_version(
         # Authenticated answer
         {
             "handshake": "answer",
-            "type": "authenticated",
+            "type": HandshakeType.AUTHENTICATED.value,
             "organization_id": "<good>",
             "device_id": "<good>",
             # Missing rvk
@@ -244,7 +249,7 @@ def test_process_challenge_req_good_multiple_api_version(
         },
         {
             "handshake": "answer",
-            "type": "authenticated",
+            "type": HandshakeType.AUTHENTICATED.value,
             "organization_id": "<good>",
             # Missing device_id
             "rvk": "<good>",
@@ -252,7 +257,7 @@ def test_process_challenge_req_good_multiple_api_version(
         },
         {
             "handshake": "answer",
-            "type": "authenticated",
+            "type": HandshakeType.AUTHENTICATED.value,
             "organization_id": "<good>",
             "device_id": "<good>",
             "rvk": "<good>",
@@ -260,7 +265,7 @@ def test_process_challenge_req_good_multiple_api_version(
         },
         {
             "handshake": "answer",
-            "type": "authenticated",
+            "type": HandshakeType.AUTHENTICATED.value,
             "organization_id": "<good>",
             "device_id": "<good>",
             "rvk": "<good>",
@@ -268,16 +273,7 @@ def test_process_challenge_req_good_multiple_api_version(
         },
         {
             "handshake": "answer",
-            "type": "authenticated",
-            "organization_id": "<good>",
-            "device_id": "<good>",
-            "rvk": "<good>",
-            "answer": b"good answer",
-            "foo": "bar",  # Unknown field
-        },
-        {
-            "handshake": "answer",
-            "type": "authenticated",
+            "type": HandshakeType.AUTHENTICATED.value,
             "organization_id": "<good>",
             "device_id": "dummy",  # Invalid DeviceID
             "rvk": "<good>",
@@ -285,41 +281,33 @@ def test_process_challenge_req_good_multiple_api_version(
         },
         {
             "handshake": "answer",
-            "type": "authenticated",
+            "type": HandshakeType.AUTHENTICATED.value,
             "organization_id": "<good>",
             "device_id": "<good>",
             "rvk": b"dummy",  # Invalid VerifyKey
             "answer": b"good answer",
         },
-        # Anonymous answer
+        # Invited answer
         {
             "handshake": "answer",
-            "type": "anonymous",
-            "organization_id": "<good>",
-            "operation": b"dummy",  # Invalid operation
-            "token": "123abc",
-        },
-        {
-            "handshake": "answer",
-            "type": "anonymous",
-            "operation": "bootstrap_organization",
+            "type": HandshakeType.INVITED.value,
+            "operation": HandshakeInvitedOperation.CLAIM_USER.value,
             "organization_id": "d@mmy",  # Invalid OrganizationID
-            "token": "123abc",
+            "token": "<good>",
         },
         {
             "handshake": "answer",
-            "type": "anonymous",
-            "operation": "bootstrap_organization",
+            "type": HandshakeType.INVITED.value,
+            "operation": "dummy",  # Invalid operation
             "organization_id": "<good>",
-            "token": 42,  # Invalid token
+            "token": "<good>",
         },
         {
             "handshake": "answer",
-            "type": "anonymous",
-            "operation": "bootstrap_organization",
+            "type": HandshakeType.INVITED.value,
+            "operation": HandshakeInvitedOperation.CLAIM_USER.value,
             "organization_id": "<good>",
-            "token": "123abc",
-            "dummy": "whatever",  # Unknown field TODO: useful ?
+            "token": "abc123",  # Invalid token type
         },
     ],
 )
@@ -328,10 +316,11 @@ def test_process_answer_req_bad_format(req, alice):
         ("organization_id", alice.organization_id),
         ("device_id", alice.device_id),
         ("rvk", alice.root_verify_key.encode()),
+        ("token", uuid4()),
     ]:
         if req.get(key) == "<good>":
             req[key] = good_value
-    req["supported_api_versions"] = [API_V2_VERSION]
+    req["client_api_version"] = API_V2_VERSION
     sh = ServerHandshake()
     sh.build_challenge_req()
     with pytest.raises(InvalidMessageError):

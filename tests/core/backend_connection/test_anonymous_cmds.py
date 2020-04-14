@@ -76,7 +76,7 @@ async def test_handshake_unknown_organization(running_backend, coolorg):
     with pytest.raises(BackendConnectionRefused) as exc:
         async with backend_anonymous_cmds_factory(unknown_org_addr) as cmds:
             await cmds.ping()
-    assert str(exc.value) == "Unknown Organization or Device"
+    assert str(exc.value) == "Invalid handshake information"
 
 
 @pytest.mark.trio

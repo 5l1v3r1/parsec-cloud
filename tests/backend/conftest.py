@@ -9,8 +9,9 @@ from parsec.api.data import RealmRoleCertificateContent
 from parsec.api.protocol import (
     OrganizationID,
     RealmRole,
+    HandshakeInvitedOperation,
     AuthenticatedClientHandshake,
-    AnonymousClientHandshake,
+    InvitedClientHandshake,
     APIV1_AuthenticatedClientHandshake,
     APIV1_AnonymousClientHandshake,
     APIV1_AdministrationClientHandshake,
@@ -173,19 +174,19 @@ async def bob_backend_sock(apiv2_backend_sock_factory, backend, bob):
 
 
 @pytest.fixture
-def apiv2_backend_anonymous_sock_factory(backend_raw_transport_factory):
+def backend_invited_sock_factory(backend_raw_transport_factory):
     @asynccontextmanager
     async def _backend_sock_factory(
         backend,
         organization_id: OrganizationID,
-        operation: str,
-        token: str,
+        operation: HandshakeInvitedOperation,
+        token: UUID,
         freeze_on_transport_error: bool = True,
     ):
         async with backend_raw_transport_factory(
             backend, freeze_on_transport_error=freeze_on_transport_error
         ) as transport:
-            ch = AnonymousClientHandshake(
+            ch = InvitedClientHandshake(
                 organization_id=organization_id, operation=operation, token=token
             )
             challenge_req = await transport.recv()

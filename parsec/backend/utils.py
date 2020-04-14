@@ -2,25 +2,31 @@
 
 import trio
 from functools import wraps
+from typing import Union, List
 
-from parsec.api.protocol import ProtocolError, InvalidMessageError
+from parsec.api.protocol import (
+    ProtocolError,
+    InvalidMessageError,
+    HandshakeType,
+    APIV1_HandshakeType,
+)
 from parsec.api.version import API_V1_VERSION, API_V2_VERSION
 
 
 ALLOWED_API_VERSIONS = {API_V1_VERSION.version, API_V2_VERSION.version}
-ALLOWED_API_AUTHS = {"authenticated", "anonymous", "administration"}
 
 
-def api(cmd, *, auth=("authenticated",), version=(1, 2)):
-    auths = {auth} if isinstance(auth, str) else set(auth)
-    versions = {version} if isinstance(version, int) else set(version)
-
-    assert not auths - ALLOWED_API_AUTHS
-    assert not versions - ALLOWED_API_VERSIONS
-
+def api(
+    cmd: str,
+    *,
+    handshake_types: List[Union[HandshakeType, APIV1_HandshakeType]] = (
+        HandshakeType.AUTHENTICATED,
+        APIV1_HandshakeType.AUTHENTICATED,
+    ),
+):
     def wrapper(fn):
         assert not hasattr(fn, "_api_info")
-        fn._api_info = {"cmd": cmd, "auths": auths, "versions": versions}
+        fn._api_info = {"cmd": cmd, "handshake_types": handshake_types}
         return fn
 
     return wrapper
@@ -35,17 +41,12 @@ def collect_apis(*components):
             if not info:
                 continue
 
-            for version in info["versions"]:
-                if version not in apis:
-                    apis[version] = {}
+            for handshake_type in info["handshake_types"]:
+                if handshake_type not in apis:
+                    apis[handshake_type] = {}
 
-                api = apis[version]
-                for auth in info["auths"]:
-                    if auth not in api:
-                        api[auth] = {}
-
-                    assert info["cmd"] not in api[auth]
-                    api[auth][info["cmd"]] = meth
+                assert info["cmd"] not in apis[handshake_type]
+                apis[handshake_type][info["cmd"]] = meth
 
     return apis
 

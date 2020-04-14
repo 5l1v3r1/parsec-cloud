@@ -4,6 +4,7 @@ from enum import Enum
 
 from parsec.serde import BaseSchema, OneOfSchema, fields
 from parsec.api.protocol.base import BaseReqSchema, BaseRepSchema, CmdSerializer
+from parsec.api.protocol.types import HumanHandleField, UserIDField
 
 
 __all__ = (
@@ -11,32 +12,37 @@ __all__ = (
     "invite_delete_serializer",
     "invite_list_serializer",
     "invite_info_serializer",
-    "invite_1_wait_peer_serializer",
-    "invite_2_send_hash_nonce_serializer",
-    "invite_2_get_hashed_nonce_serializer",
-    "invite_2_send_nonce_serializer",
-    "invite_3_wait_peer_trust_serializer",
-    "invite_3_signify_trust_serializer",
-    "invite_4_communicate_serializer",
+    "invite_1_invitee_wait_peer_serializer",
+    "invite_1_inviter_wait_peer_serializer",
+    "invite_2_invitee_send_hashed_nonce_serializer",
+    "invite_2_inviter_get_hashed_nonce_serializer",
+    "invite_2_inviter_send_nonce_serializer",
+    "invite_2_invitee_send_nonce_serializer",
+    "invite_3_inviter_wait_peer_trust_serializer",
+    "invite_3_invitee_wait_peer_trust_serializer",
+    "invite_3_inviter_signify_trust_serializer",
+    "invite_3_invitee_signify_trust_serializer",
+    "invite_4_inviter_communicate_serializer",
+    "invite_4_invitee_communicate_serializer",
 )
 
 
 class InvitationType(Enum):
-    USER = "USER"
-    DEVICE = "DEVICE"
+    USER = "user"
+    DEVICE = "device"
 
 
 InvitationTypeField = fields.enum_field_factory(InvitationType)
 
 
-class InviteNewUserReqSchema(BaseRepSchema):
-    type = fields.CheckedConstant(InvitationType.USER, required=True)
-    email = fields.String(required=True)
+class InviteNewUserReqSchema(BaseReqSchema):
+    type = fields.EnumCheckedConstant(InvitationType.USER, required=True)
+    invitee_email = fields.String(required=True)
     send_email = fields.Boolean(required=True)
 
 
-class InviteNewDeviceReqSchema(BaseRepSchema):
-    type = fields.CheckedConstant(InvitationType.DEVICE, required=True)
+class InviteNewDeviceReqSchema(BaseReqSchema):
+    type = fields.EnumCheckedConstant(InvitationType.DEVICE, required=True)
     send_email = fields.Boolean(required=True)
 
 
@@ -44,12 +50,12 @@ class InviteNewReqSchema(OneOfSchema):
     type_field = "type"
     type_field_remove = False
     type_schemas = {
-        InvitationType.USER: InviteNewUserReqSchema(),
-        InvitationType.DEVICE: InviteNewDeviceReqSchema(),
+        InvitationType.USER.value: InviteNewUserReqSchema(),
+        InvitationType.DEVICE.value: InviteNewDeviceReqSchema(),
     }
 
     def get_obj_type(self, obj):
-        return obj["type"]
+        return obj["type"].value
 
 
 class InviteNewRepSchema(BaseRepSchema):
@@ -60,9 +66,9 @@ invite_new_serializer = CmdSerializer(InviteNewReqSchema, InviteNewRepSchema)
 
 
 class InvitationDeletedReason(Enum):
-    FINISHED = "FINISHED"
-    CANCELLED = "CANCELLED"
-    ROTTEN = "ROTTEN"
+    FINISHED = "finished"
+    CANCELLED = "cancelled"
+    ROTTEN = "rotten"
 
 
 InvitationDeletedReasonField = fields.enum_field_factory(InvitationDeletedReason)
@@ -85,20 +91,43 @@ class InviteListReqSchema(BaseReqSchema):
 
 
 class InvitationStatus(Enum):
-    IDLE = "IDLE"
-    READY = "READY"
-    DELETED = "DELETED"
+    IDLE = "idle"
+    READY = "ready"
+    DELETED = "deleted"
 
 
 InvitationStatusField = fields.enum_field_factory(InvitationStatus)
 
 
-class InviteListItemSchema(BaseSchema):
+class InviteListItemUserSchema(BaseSchema):
+    type = fields.EnumCheckedConstant(InvitationType.USER, required=True)
     token = fields.UUID(required=True)
-    type = InvitationTypeField(required=True)
-    created = fields.DateTime(required=True)
+    created_on = fields.DateTime(required=True)
+    invitee_email = fields.String(required=True)
     status = InvitationStatusField(required=True)
-    deleted_reason = InvitationDeletedReason(allow_none=True, missing=None)
+    deleted_on = fields.DateTime(allow_none=True, missing=None)
+    deleted_reason = InvitationDeletedReasonField(allow_none=True, missing=None)
+
+
+class InviteListItemDeviceSchema(BaseSchema):
+    type = fields.EnumCheckedConstant(InvitationType.DEVICE, required=True)
+    token = fields.UUID(required=True)
+    created_on = fields.DateTime(required=True)
+    status = InvitationStatusField(required=True)
+    deleted_on = fields.DateTime(allow_none=True, missing=None)
+    deleted_reason = InvitationDeletedReasonField(allow_none=True, missing=None)
+
+
+class InviteListItemSchema(OneOfSchema):
+    type_field = "type"
+    type_field_remove = False
+    type_schemas = {
+        InvitationType.USER.value: InviteListItemUserSchema(),
+        InvitationType.DEVICE.value: InviteListItemDeviceSchema(),
+    }
+
+    def get_obj_type(self, obj):
+        return obj["type"].value
 
 
 class InviteListRepSchema(BaseRepSchema):
@@ -112,99 +141,188 @@ class InviteInfoReqSchema(BaseReqSchema):
     pass
 
 
-class InviteInfoRepSchema(BaseRepSchema):
-    type = InvitationTypeField(required=True)
-    email = fields.String(required=True)  # Only for user
-    inviter_human_email = fields.String(required=True)
-    inviter_human_label = fields.String(required=True)
+class InviteInfoUserRepSchema(BaseRepSchema):
+    type = fields.EnumCheckedConstant(InvitationType.USER, required=True)
+    invitee_email = fields.String(required=True)
+    inviter_user_id = UserIDField(required=True)
+    inviter_human_handle = HumanHandleField(allow_none=True, missing=True)
+
+
+class InviteInfoDeviceRepSchema(BaseRepSchema):
+    type = fields.EnumCheckedConstant(InvitationType.DEVICE, required=True)
+    inviter_user_id = UserIDField(required=True)
+    inviter_human_handle = HumanHandleField(allow_none=True, missing=True)
+
+
+class InviteInfoRepSchema(OneOfSchema):
+    type_field = "type"
+    type_field_remove = False
+    type_schemas = {
+        InvitationType.USER.value: InviteInfoUserRepSchema(),
+        InvitationType.DEVICE.value: InviteInfoDeviceRepSchema(),
+    }
+
+    def get_obj_type(self, obj):
+        return obj["type"].value
 
 
 invite_info_serializer = CmdSerializer(InviteInfoReqSchema, InviteInfoRepSchema)
 
 
-class Invite1WaitPeerReqSchema(BaseReqSchema):
-    token = fields.String(required=True)
-    public_key = fields.PublicKey(required=True)
+class Invite1InviteeWaitPeerReqSchema(BaseReqSchema):
+    invitee_public_key = fields.PublicKey(required=True)
 
 
-class Invite1WaitPeerRepSchema(BaseRepSchema):
-    peer_public_key = fields.PublicKey(required=True)
+class Invite1InviteeWaitPeerRepSchema(BaseRepSchema):
+    inviter_public_key = fields.PublicKey(required=True)
 
 
-invite_1_wait_peer_serializer = CmdSerializer(Invite1WaitPeerReqSchema, Invite1WaitPeerRepSchema)
-
-
-class Invite2SendHashNonceReqSchema(BaseReqSchema):
-    hashed_nonce = fields.String(required=True)
-
-
-class Invite2SendHashNonceRepSchema(BaseRepSchema):
-    nonce = fields.String(required=True)
-
-
-invite_2_send_hash_nonce_serializer = CmdSerializer(
-    Invite2SendHashNonceReqSchema, Invite2SendHashNonceRepSchema
+invite_1_invitee_wait_peer_serializer = CmdSerializer(
+    Invite1InviteeWaitPeerReqSchema, Invite1InviteeWaitPeerRepSchema
 )
 
 
-class Invite2GetHashedNonceReqSchema(BaseReqSchema):
-    pass
+class Invite1InviterWaitPeerReqSchema(BaseReqSchema):
+    token = fields.UUID(required=True)
+    inviter_public_key = fields.PublicKey(required=True)
 
 
-class Invite2GetHashedNonceRepSchema(BaseRepSchema):
-    nonce = fields.String(required=True)
+class Invite1InviterWaitPeerRepSchema(BaseRepSchema):
+    invitee_public_key = fields.PublicKey(required=True)
 
 
-invite_2_get_hashed_nonce_serializer = CmdSerializer(
-    Invite2GetHashedNonceReqSchema, Invite2GetHashedNonceRepSchema
+invite_1_inviter_wait_peer_serializer = CmdSerializer(
+    Invite1InviterWaitPeerReqSchema, Invite1InviterWaitPeerRepSchema
 )
 
 
-class Invite2SendNonceReqSchema(BaseReqSchema):
-    nonce = fields.String(required=True)
+class Invite2InviteeSendHashedNonceHashNonceReqSchema(BaseReqSchema):
+    invitee_hashed_nonce = fields.Bytes(required=True)
 
 
-class Invite2SendNonceRepSchema(BaseRepSchema):
-    nonce = fields.String(required=True)
+class Invite2InviteeSendHashedNonceHashNonceRepSchema(BaseRepSchema):
+    inviter_nonce = fields.Bytes(required=True)
 
 
-invite_2_send_nonce_serializer = CmdSerializer(Invite2SendNonceReqSchema, Invite2SendNonceRepSchema)
-
-
-class Invite3WaitPeerTrustReqSchema(BaseReqSchema):
-    pass
-
-
-class Invite3WaitPeerTrustRepSchema(BaseRepSchema):
-    pass
-
-
-invite_3_wait_peer_trust_serializer = CmdSerializer(
-    Invite3WaitPeerTrustReqSchema, Invite3WaitPeerTrustRepSchema
+invite_2_invitee_send_hashed_nonce_serializer = CmdSerializer(
+    Invite2InviteeSendHashedNonceHashNonceReqSchema, Invite2InviteeSendHashedNonceHashNonceRepSchema
 )
 
 
-class Invite3SignifyTrustReqSchema(BaseReqSchema):
-    pass
+class Invite2InviterGetHashedNonceReqSchema(BaseReqSchema):
+    token = fields.UUID(required=True)
 
 
-class Invite3SignifyTrustRepSchema(BaseRepSchema):
-    pass
+class Invite2InviterGetHashedNonceRepSchema(BaseRepSchema):
+    invitee_hashed_nonce = fields.Bytes(required=True)
 
 
-invite_3_signify_trust_serializer = CmdSerializer(
-    Invite3SignifyTrustReqSchema, Invite3SignifyTrustRepSchema
+invite_2_inviter_get_hashed_nonce_serializer = CmdSerializer(
+    Invite2InviterGetHashedNonceReqSchema, Invite2InviterGetHashedNonceRepSchema
 )
 
 
-class Invite4CommunicateReqSchema(BaseReqSchema):
+class Invite2InviterSendNonceReqSchema(BaseReqSchema):
+    token = fields.UUID(required=True)
+    inviter_nonce = fields.Bytes(required=True)
+
+
+class Invite2InviterSendNonceRepSchema(BaseRepSchema):
+    invitee_nonce = fields.Bytes(required=True)
+
+
+invite_2_inviter_send_nonce_serializer = CmdSerializer(
+    Invite2InviterSendNonceReqSchema, Invite2InviterSendNonceRepSchema
+)
+
+
+class Invite2InviteeSendNonceReqSchema(BaseReqSchema):
+    invitee_nonce = fields.Bytes(required=True)
+
+
+class Invite2InviteeSendNonceRepSchema(BaseRepSchema):
+    pass
+
+
+invite_2_invitee_send_nonce_serializer = CmdSerializer(
+    Invite2InviteeSendNonceReqSchema, Invite2InviteeSendNonceRepSchema
+)
+
+
+class Invite3InviterWaitPeerTrustReqSchema(BaseReqSchema):
+    token = fields.UUID(required=True)
+
+
+class Invite3InviterWaitPeerTrustRepSchema(BaseRepSchema):
+    pass
+
+
+invite_3_inviter_wait_peer_trust_serializer = CmdSerializer(
+    Invite3InviterWaitPeerTrustReqSchema, Invite3InviterWaitPeerTrustRepSchema
+)
+
+
+class Invite3InviteeWaitPeerTrustReqSchema(BaseReqSchema):
+    pass
+
+
+class Invite3InviteeWaitPeerTrustRepSchema(BaseRepSchema):
+    pass
+
+
+invite_3_invitee_wait_peer_trust_serializer = CmdSerializer(
+    Invite3InviteeWaitPeerTrustReqSchema, Invite3InviteeWaitPeerTrustRepSchema
+)
+
+
+class Invite3InviterSignifyTrustReqSchema(BaseReqSchema):
+    token = fields.UUID(required=True)
+
+
+class Invite3InviterSignifyTrustRepSchema(BaseRepSchema):
+    pass
+
+
+invite_3_inviter_signify_trust_serializer = CmdSerializer(
+    Invite3InviterSignifyTrustReqSchema, Invite3InviterSignifyTrustRepSchema
+)
+
+
+class Invite3InviteeSignifyTrustReqSchema(BaseReqSchema):
+    pass
+
+
+class Invite3InviteeSignifyTrustRepSchema(BaseRepSchema):
+    pass
+
+
+invite_3_invitee_signify_trust_serializer = CmdSerializer(
+    Invite3InviteeSignifyTrustReqSchema, Invite3InviteeSignifyTrustRepSchema
+)
+
+
+class Invite4InviterCommunicateReqSchema(BaseReqSchema):
+    token = fields.UUID(required=True)
     payload = fields.Bytes(allow_none=True, missing=None)
 
 
-class Invite4CommunicateRepSchema(BaseRepSchema):
-    pass
+class Invite4InviterCommunicateRepSchema(BaseRepSchema):
+    payload = fields.Bytes(allow_none=True, missing=None)
 
 
-invite_4_communicate_serializer = CmdSerializer(
-    Invite4CommunicateReqSchema, Invite4CommunicateRepSchema
+invite_4_inviter_communicate_serializer = CmdSerializer(
+    Invite4InviterCommunicateReqSchema, Invite4InviterCommunicateRepSchema
+)
+
+
+class Invite4InviteeCommunicateReqSchema(BaseReqSchema):
+    payload = fields.Bytes(allow_none=True, missing=None)
+
+
+class Invite4InviteeCommunicateRepSchema(BaseRepSchema):
+    payload = fields.Bytes(allow_none=True, missing=None)
+
+
+invite_4_invitee_communicate_serializer = CmdSerializer(
+    Invite4InviteeCommunicateReqSchema, Invite4InviteeCommunicateRepSchema
 )

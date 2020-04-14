@@ -2,9 +2,11 @@
 
 import pytest
 
-from parsec.api.protocol import packb, unpackb
+from parsec.api.version import ApiVersion
 from parsec.api.transport import Transport
-from parsec.api.protocol.handshake import (
+from parsec.api.protocol import (
+    packb,
+    unpackb,
     ServerHandshake,
     APIV1_AuthenticatedClientHandshake,
     APIV1_AnonymousClientHandshake,
@@ -14,7 +16,6 @@ from parsec.api.protocol.handshake import (
     HandshakeBadAdministrationToken,
     HandshakeOrganizationExpired,
     InvalidMessageError,
-    ApiVersion,
 )
 
 

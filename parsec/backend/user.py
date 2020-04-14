@@ -19,6 +19,8 @@ from parsec.api.protocol import (
     UserID,
     DeviceID,
     HumanHandle,
+    HandshakeType,
+    APIV1_HandshakeType,
     user_get_serializer,
     apiv1_user_find_serializer,
     human_find_serializer,
@@ -209,7 +211,7 @@ class BaseUserComponent:
             }
         )
 
-    @api("user_find", version=1)
+    @api("user_find", handshake_types=[APIV1_HandshakeType.AUTHENTICATED])
     @catch_protocol_errors
     async def api_user_find(self, client_ctx, msg):
         msg = apiv1_user_find_serializer.req_load(msg)
@@ -224,7 +226,7 @@ class BaseUserComponent:
             }
         )
 
-    @api("human_find", version=2)
+    @api("human_find", handshake_types=[HandshakeType.AUTHENTICATED])
     @catch_protocol_errors
     async def api_human_find(self, client_ctx, msg):
         msg = human_find_serializer.req_load(msg)
@@ -241,7 +243,7 @@ class BaseUserComponent:
 
     #### User creation API ####
 
-    @api("user_invite", version=1)
+    @api("user_invite", handshake_types=[APIV1_HandshakeType.AUTHENTICATED])
     @catch_protocol_errors
     async def api_user_invite(self, client_ctx, msg):
         if not client_ctx.is_admin:
@@ -286,7 +288,7 @@ class BaseUserComponent:
 
         return {"status": "ok", "encrypted_claim": event_data["encrypted_claim"]}
 
-    @api("user_get_invitation_creator", version=1, auth="anonymous")
+    @api("user_get_invitation_creator", handshake_types=[APIV1_HandshakeType.ANONYMOUS])
     @catch_protocol_errors
     async def api_user_get_invitation_creator(self, client_ctx, msg):
         msg = apiv1_user_get_invitation_creator_serializer.req_load(msg)
@@ -318,7 +320,7 @@ class BaseUserComponent:
             }
         )
 
-    @api("user_claim", version=1, auth="anonymous")
+    @api("user_claim", handshake_types=[APIV1_HandshakeType.ANONYMOUS])
     @catch_protocol_errors
     async def api_user_claim(self, client_ctx, msg):
         msg = apiv1_user_claim_serializer.req_load(msg)
@@ -393,7 +395,7 @@ class BaseUserComponent:
                 "device_certificate": first_device_certificate,
             }
 
-    @api("user_cancel_invitation", version=1)
+    @api("user_cancel_invitation", handshake_types=[APIV1_HandshakeType.AUTHENTICATED])
     @catch_protocol_errors
     async def api_user_cancel_invitation(self, client_ctx, msg):
         if not client_ctx.is_admin:
@@ -530,7 +532,7 @@ class BaseUserComponent:
 
     #### Device creation API ####
 
-    @api("device_invite", version=1)
+    @api("device_invite", handshake_types=[APIV1_HandshakeType.AUTHENTICATED])
     @catch_protocol_errors
     async def api_device_invite(self, client_ctx, msg):
         msg = apiv1_device_invite_serializer.req_load(msg)
@@ -572,7 +574,7 @@ class BaseUserComponent:
 
         return {"status": "ok", "encrypted_claim": event_data["encrypted_claim"]}
 
-    @api("device_get_invitation_creator", version=1, auth="anonymous")
+    @api("device_get_invitation_creator", handshake_types=[APIV1_HandshakeType.ANONYMOUS])
     @catch_protocol_errors
     async def api_device_get_invitation_creator(self, client_ctx, msg):
         msg = apiv1_device_get_invitation_creator_serializer.req_load(msg)
@@ -604,7 +606,7 @@ class BaseUserComponent:
             }
         )
 
-    @api("device_claim", version=1, auth="anonymous")
+    @api("device_claim", handshake_types=[APIV1_HandshakeType.ANONYMOUS])
     @catch_protocol_errors
     async def api_device_claim(self, client_ctx, msg):
         msg = apiv1_device_claim_serializer.req_load(msg)
@@ -674,7 +676,7 @@ class BaseUserComponent:
                 }
             )
 
-    @api("device_cancel_invitation", version=1)
+    @api("device_cancel_invitation", handshake_types=[APIV1_HandshakeType.AUTHENTICATED])
     @catch_protocol_errors
     async def api_device_cancel_invitation(self, client_ctx, msg):
         msg = apiv1_device_cancel_invitation_serializer.req_load(msg)

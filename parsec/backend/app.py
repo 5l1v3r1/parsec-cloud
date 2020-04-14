@@ -18,7 +18,7 @@ from parsec.api.protocol import (
 )
 from parsec.backend.utils import CancelledByNewRequest, collect_apis
 from parsec.backend.config import BackendConfig
-from parsec.backend.client_context import AuthenticatedClientContext
+from parsec.backend.client_context import AuthenticatedClientContext, InvitedClientContext
 from parsec.backend.handshake import do_handshake
 from parsec.backend.memory import components_factory as mocked_components_factory
 from parsec.backend.postgresql import components_factory as postgresql_components_factory
@@ -140,8 +140,8 @@ class BackendApp:
             selected_logger.info("Connection established")
 
             if isinstance(client_ctx, AuthenticatedClientContext):
-                with self.event_bus.connection_context() as client_ctx.event_bus_ctx:
-                    with trio.CancelScope() as cancel_scope:
+                with trio.CancelScope() as cancel_scope:
+                    with self.event_bus.connection_context() as client_ctx.event_bus_ctx:
 
                         def _on_revoked(event, organization_id, user_id):
                             if (
@@ -151,6 +151,23 @@ class BackendApp:
                                 cancel_scope.cancel()
 
                         client_ctx.event_bus_ctx.connect("user.revoked", _on_revoked)
+                        await self._handle_client_loop(transport, client_ctx)
+
+            elif isinstance(client_ctx, InvitedClientContext):
+                with trio.CancelScope() as cancel_scope:
+                    with self.event_bus.connection_context() as event_bus_ctx:
+
+                        def _on_invite_status_changed(
+                            event, organization_id, inviter, token, is_deleted
+                        ):
+                            if (
+                                is_deleted
+                                and organization_id == client_ctx.organization_id
+                                and token == client_ctx.invitation.token
+                            ):
+                                cancel_scope.cancel()
+
+                        event_bus_ctx.connect("invite.status_changed", _on_invite_status_changed)
                         await self._handle_client_loop(transport, client_ctx)
 
             else:
@@ -172,7 +189,7 @@ class BackendApp:
 
     async def _handle_client_loop(self, transport, client_ctx):
         # Retreive the allowed commands according to api version and auth type
-        api_cmds = self.apis[client_ctx.api_version.version][client_ctx.api_auth]
+        api_cmds = self.apis[client_ctx.handshake_type]
 
         raw_req = None
         while True:

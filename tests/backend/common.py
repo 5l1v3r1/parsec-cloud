@@ -26,6 +26,22 @@ from parsec.api.protocol import (
     events_listen_serializer,
     user_get_serializer,
     apiv1_user_find_serializer,
+    invite_new_serializer,
+    invite_list_serializer,
+    invite_delete_serializer,
+    invite_info_serializer,
+    invite_1_invitee_wait_peer_serializer,
+    invite_1_inviter_wait_peer_serializer,
+    invite_2_invitee_send_hashed_nonce_serializer,
+    invite_2_inviter_get_hashed_nonce_serializer,
+    invite_2_inviter_send_nonce_serializer,
+    invite_2_invitee_send_nonce_serializer,
+    invite_3_inviter_wait_peer_trust_serializer,
+    invite_3_invitee_wait_peer_trust_serializer,
+    invite_3_inviter_signify_trust_serializer,
+    invite_3_invitee_signify_trust_serializer,
+    invite_4_inviter_communicate_serializer,
+    invite_4_invitee_communicate_serializer,
 )
 
 
@@ -322,3 +338,170 @@ async def user_find(sock, **kwargs):
     await sock.send(apiv1_user_find_serializer.req_dumps({"cmd": "user_find", **kwargs}))
     raw_rep = await sock.recv()
     return apiv1_user_find_serializer.rep_loads(raw_rep)
+
+
+### Invite ###
+
+
+async def invite_new(sock, type, send_email=False, invitee_email=None):
+    await sock.send(
+        invite_new_serializer.req_dumps(
+            {
+                "cmd": "invite_new",
+                "type": type,
+                "send_email": send_email,
+                "invitee_email": invitee_email,
+            }
+        )
+    )
+    raw_rep = await sock.recv()
+    return invite_new_serializer.rep_loads(raw_rep)
+
+
+async def invite_list(sock):
+    await sock.send(invite_list_serializer.req_dumps({"cmd": "invite_list"}))
+    raw_rep = await sock.recv()
+    return invite_list_serializer.rep_loads(raw_rep)
+
+
+async def invite_delete(sock, token, reason):
+    await sock.send(
+        invite_delete_serializer.req_dumps(
+            {"cmd": "invite_delete", "token": token, "reason": reason}
+        )
+    )
+    raw_rep = await sock.recv()
+    return invite_delete_serializer.rep_loads(raw_rep)
+
+
+async def invite_info(sock):
+    await sock.send(invite_info_serializer.req_dumps({"cmd": "invite_info"}))
+    raw_rep = await sock.recv()
+    return invite_info_serializer.rep_loads(raw_rep)
+
+
+async def invite_1_invitee_wait_peer(sock, invitee_public_key):
+    await sock.send(
+        invite_1_invitee_wait_peer_serializer.req_dumps(
+            {"cmd": "invite_1_invitee_wait_peer", "invitee_public_key": invitee_public_key}
+        )
+    )
+    raw_rep = await sock.recv()
+    return invite_1_invitee_wait_peer_serializer.rep_loads(raw_rep)
+
+
+async def invite_1_inviter_wait_peer(sock, token, inviter_public_key):
+    await sock.send(
+        invite_1_inviter_wait_peer_serializer.req_dumps(
+            {
+                "cmd": "invite_1_inviter_wait_peer",
+                "token": token,
+                "inviter_public_key": inviter_public_key,
+            }
+        )
+    )
+    raw_rep = await sock.recv()
+    return invite_1_inviter_wait_peer_serializer.rep_loads(raw_rep)
+
+
+async def invite_2_invitee_send_hashed_nonce(sock, invitee_hashed_nonce):
+    await sock.send(
+        invite_2_invitee_send_hashed_nonce_serializer.req_dumps(
+            {
+                "cmd": "invite_2_invitee_send_hashed_nonce",
+                "invitee_hashed_nonce": invitee_hashed_nonce,
+            }
+        )
+    )
+    raw_rep = await sock.recv()
+    return invite_2_invitee_send_hashed_nonce_serializer.rep_loads(raw_rep)
+
+
+async def invite_2_inviter_get_hashed_nonce(sock, token):
+    await sock.send(
+        invite_2_inviter_get_hashed_nonce_serializer.req_dumps(
+            {"cmd": "invite_2_inviter_get_hashed_nonce", "token": token}
+        )
+    )
+    raw_rep = await sock.recv()
+    return invite_2_inviter_get_hashed_nonce_serializer.rep_loads(raw_rep)
+
+
+async def invite_2_inviter_send_nonce(sock, token, inviter_nonce):
+    await sock.send(
+        invite_2_inviter_send_nonce_serializer.req_dumps(
+            {"cmd": "invite_2_inviter_send_nonce", "token": token, "inviter_nonce": inviter_nonce}
+        )
+    )
+    raw_rep = await sock.recv()
+    return invite_2_inviter_send_nonce_serializer.rep_loads(raw_rep)
+
+
+async def invite_2_invitee_send_nonce(sock, invitee_nonce):
+    await sock.send(
+        invite_2_invitee_send_nonce_serializer.req_dumps(
+            {"cmd": "invite_2_invitee_send_nonce", "invitee_nonce": invitee_nonce}
+        )
+    )
+    raw_rep = await sock.recv()
+    return invite_2_invitee_send_nonce_serializer.rep_loads(raw_rep)
+
+
+async def invite_3_inviter_wait_peer_trust(sock, token):
+    await sock.send(
+        invite_3_inviter_wait_peer_trust_serializer.req_dumps(
+            {"cmd": "invite_3_inviter_wait_peer_trust", "token": token}
+        )
+    )
+    raw_rep = await sock.recv()
+    return invite_3_inviter_wait_peer_trust_serializer.rep_loads(raw_rep)
+
+
+async def invite_3_invitee_wait_peer_trust(sock):
+    await sock.send(
+        invite_3_invitee_wait_peer_trust_serializer.req_dumps(
+            {"cmd": "invite_3_invitee_wait_peer_trust"}
+        )
+    )
+    raw_rep = await sock.recv()
+    return invite_3_invitee_wait_peer_trust_serializer.rep_loads(raw_rep)
+
+
+async def invite_3_inviter_signify_trust(sock, token):
+    await sock.send(
+        invite_3_inviter_signify_trust_serializer.req_dumps(
+            {"cmd": "invite_3_inviter_signify_trust", "token": token}
+        )
+    )
+    raw_rep = await sock.recv()
+    return invite_3_inviter_signify_trust_serializer.rep_loads(raw_rep)
+
+
+async def invite_3_invitee_signify_trust(sock):
+    await sock.send(
+        invite_3_invitee_signify_trust_serializer.req_dumps(
+            {"cmd": "invite_3_invitee_signify_trust"}
+        )
+    )
+    raw_rep = await sock.recv()
+    return invite_3_invitee_signify_trust_serializer.rep_loads(raw_rep)
+
+
+async def invite_4_inviter_communicate(sock, token, payload):
+    await sock.send(
+        invite_4_inviter_communicate_serializer.req_dumps(
+            {"cmd": "invite_4_inviter_communicate", "token": token, "payload": payload}
+        )
+    )
+    raw_rep = await sock.recv()
+    return invite_4_inviter_communicate_serializer.rep_loads(raw_rep)
+
+
+async def invite_4_invitee_communicate(sock, payload):
+    await sock.send(
+        invite_4_invitee_communicate_serializer.req_dumps(
+            {"cmd": "invite_4_invitee_communicate", "payload": payload}
+        )
+    )
+    raw_rep = await sock.recv()
+    return invite_4_invitee_communicate_serializer.rep_loads(raw_rep)

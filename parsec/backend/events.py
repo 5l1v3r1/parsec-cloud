@@ -54,9 +54,10 @@ class EventsComponent:
             ):
                 return
 
-            msg = {"event": event, "realm_id": realm_id, **kwargs}
             try:
-                client_ctx.send_events_channel.send_nowait(msg)
+                client_ctx.send_events_channel.send_nowait(
+                    {"event": event, "realm_id": realm_id, **kwargs}
+                )
             except trio.WouldBlock:
                 client_ctx.logger.warning(f"event queue is full for {client_ctx}")
 
@@ -69,6 +70,15 @@ class EventsComponent:
             except trio.WouldBlock:
                 client_ctx.logger.warning(f"event queue is full for {client_ctx}")
 
+        def _on_invite_status_changed(event, organization_id, inviter, token, is_deleted):
+            if organization_id != client_ctx.organization_id or inviter != client_ctx.user_id:
+                return
+
+            try:
+                client_ctx.send_events_channel.send_nowait({"event": event, "token": token})
+            except trio.WouldBlock:
+                client_ctx.logger.warning(f"event queue is full for {client_ctx}")
+
         # Drop previous event callbacks if any
         client_ctx.event_bus_ctx.clear()
 
@@ -78,6 +88,7 @@ class EventsComponent:
         client_ctx.event_bus_ctx.connect("realm.maintenance_started", _on_realm_events)
         client_ctx.event_bus_ctx.connect("realm.maintenance_finished", _on_realm_events)
         client_ctx.event_bus_ctx.connect("message.received", _on_message_received)
+        client_ctx.event_bus_ctx.connect("invite.status_changed", _on_invite_status_changed)
 
         # Final event to keep up to date the list of realm we should listen on
         client_ctx.event_bus_ctx.connect("realm.roles_updated", _on_roles_updated)

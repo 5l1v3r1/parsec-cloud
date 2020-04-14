@@ -2,14 +2,17 @@
 
 import pytest
 
-from parsec.api.protocol.base import packb, unpackb
 from parsec.api.protocol import (
+    packb,
+    unpackb,
+    HandshakeInvitedOperation,
     AUTHENTICATED_CMDS,
-    ANONYMOUS_CMDS,
+    INVITED_CMDS,
     APIV1_ADMINISTRATION_CMDS,
     APIV1_AUTHENTICATED_CMDS,
     APIV1_ANONYMOUS_CMDS,
 )
+from parsec.backend.invite import DeviceInvitation
 
 
 async def check_forbidden_cmds(backend_sock, cmds):
@@ -35,20 +38,24 @@ async def check_allowed_cmds(backend_sock, cmds):
 
 
 @pytest.mark.trio
-async def test_anonymous_has_limited_access(backend, apiv2_backend_anonymous_sock_factory, coolorg):
-    async with apiv2_backend_anonymous_sock_factory(
+async def test_invited_has_limited_access(backend, backend_invited_sock_factory, alice):
+    invitation = DeviceInvitation(
+        inviter_user_id=alice.user_id, inviter_human_handle=alice.human_handle
+    )
+    await backend.invite.new(organization_id=alice.organization_id, invitation=invitation)
+    async with backend_invited_sock_factory(
         backend,
-        organization_id=coolorg.organization_id,
-        operation="bootstrap_organization",
-        token="123abc",
+        organization_id=alice.organization_id,
+        operation=HandshakeInvitedOperation.CLAIM_DEVICE,
+        token=invitation.token,
     ) as sock:
-        await check_forbidden_cmds(sock, AUTHENTICATED_CMDS - ANONYMOUS_CMDS)
-        await check_allowed_cmds(sock, ANONYMOUS_CMDS)
+        await check_forbidden_cmds(sock, AUTHENTICATED_CMDS - INVITED_CMDS)
+        await check_allowed_cmds(sock, INVITED_CMDS)
 
 
 @pytest.mark.trio
 async def test_authenticated_has_limited_access(alice_backend_sock):
-    await check_forbidden_cmds(alice_backend_sock, ANONYMOUS_CMDS - AUTHENTICATED_CMDS)
+    await check_forbidden_cmds(alice_backend_sock, INVITED_CMDS - AUTHENTICATED_CMDS)
     await check_allowed_cmds(alice_backend_sock, AUTHENTICATED_CMDS)
 
 

@@ -16,7 +16,7 @@ AUTHENTICATED_CMDS = {
     "invite_new",
     "invite_delete",
     "invite_list",
-    "invite_1_wait_peer",
+    "invite_1_wait_invitee",
     "invite_2_get_hashed_nonce",
     "invite_2_send_nonce",
     "invite_3_wait_peer_trust",
@@ -41,11 +41,10 @@ AUTHENTICATED_CMDS = {
     "realm_start_reencryption_maintenance",
     "realm_finish_reencryption_maintenance",
 }
-ANONYMOUS_CMDS = {
+INVITED_CMDS = {
     "ping",  # TODO: remove ping and ping event (only have them in tests)
-    "organization_bootstrap",
     "invite_info",
-    "invite_1_wait_peer",
+    "invite_1_wait_inviter",
     "invite_2_send_hash_nonce",
     "invite_2_send_nonce",
     "invite_3_wait_peer_trust",
