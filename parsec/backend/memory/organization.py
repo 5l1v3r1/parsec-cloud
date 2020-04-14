@@ -28,7 +28,6 @@ class MemoryOrganizationComponent(BaseOrganizationComponent):
         self._vlob_component = None
         self._block_component = None
         self._organizations = {}
-        self._organizations_invitations = {}
 
     def register_components(
         self,

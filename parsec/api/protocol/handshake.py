@@ -1,6 +1,8 @@
 # Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2019 Scille SAS
 
 from typing import List, Tuple, Optional
+from uuid import UUID
+from enum import Enum
 from secrets import token_bytes
 
 from parsec.crypto import SigningKey, VerifyKey, CryptoError
@@ -105,7 +107,12 @@ class HandshakeAuthenticatedAnswerSchema(BaseSchema):
     answer = fields.Bytes(required=True)
 
 
-ANONYMOUS_OPERATIONS = ("bootstrap_organization", "claim_user", "claim_device")
+class AnonymousOperation(Enum):
+    CLAIM_USER = "CLAIM_USER"
+    CLAIM_DEVICE = "CLAIM_DEVICE"
+
+
+AnonymousOperationField = fields.enum_field_factory(AnonymousOperation)
 
 
 class HandshakeAnonymousAnswerSchema(BaseSchema):
@@ -113,8 +120,8 @@ class HandshakeAnonymousAnswerSchema(BaseSchema):
     type = fields.CheckedConstant("anonymous", required=True)
     client_api_version = ApiVersionField(required=True)
     organization_id = OrganizationIDField(required=True)
-    operation = fields.String(required=True, validate=validate.OneOf(ANONYMOUS_OPERATIONS))
-    token = fields.String(required=True)
+    operation = fields.AnonymousOperationField(required=True)
+    token = fields.UUID(required=True)
 
 
 class APIV1_HandshakeAnonymousAnswerSchema(BaseSchema):
@@ -395,8 +402,7 @@ class APIV1_AuthenticatedClientHandshake(AuthenticatedClientHandshake):
 class AnonymousClientHandshake(BaseClientHandshake):
     SUPPORTED_API_VERSIONS = (API_V2_VERSION,)
 
-    def __init__(self, organization_id: OrganizationID, operation: str, token: str):
-        assert operation in ANONYMOUS_OPERATIONS
+    def __init__(self, organization_id: OrganizationID, operation: AnonymousOperation, token: UUID):
         self.organization_id = organization_id
         self.operation = operation
         self.token = token

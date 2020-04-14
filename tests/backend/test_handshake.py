@@ -6,6 +6,7 @@ from parsec.api.protocol import packb, unpackb, OrganizationID
 from parsec.api.version import API_VERSION
 from parsec.api.transport import Transport
 from parsec.api.protocol.handshake import (
+    AnonymousOperation,
     AuthenticatedClientHandshake,
     AnonymousClientHandshake,
     HandshakeRVKMismatch,
@@ -81,7 +82,7 @@ async def test_authenticated_handshake_good(backend, server_factory, alice):
 
 
 @pytest.mark.trio
-async def test_authenticated_handshake_bad_rvk(backend, server_factory, coolorg, alice, otherorg):
+async def test_authenticated_handshake_bad_rvk(backend, server_factory, alice, otherorg):
     ch = AuthenticatedClientHandshake(
         organization_id=alice.organization_id,
         device_id=alice.device_id,
@@ -103,15 +104,18 @@ async def test_authenticated_handshake_bad_rvk(backend, server_factory, coolorg,
 
 @pytest.mark.xfail(reason="API not implemented yet")
 @pytest.mark.trio
-@pytest.mark.parametrize("operation", ["bootstrap_organization", "claim_user", "claim_device"])
-async def test_anonymous_handshake_good(backend, server_factory, coolorg, operation):
-    token = "123abc"
-    if operation == "claim_user":
-        backend.invite.new_user()  # TODO
-    elif operation == "claim_device":
-        backend.invite.new_device()  # TODO
-    else:  # bootstrap_organization
-        await backend.organization.create(id=OrganizationID("Org"), bootstrap_token=token)
+@pytest.mark.parametrize("operation", AnonymousOperation)
+async def test_anonymous_handshake_good(backend, server_factory, coolorg, alice, operation):
+    if operation == AnonymousOperation.CLAIM_USER:
+        token = await backend.invite.new_user(
+            organization_id=coolorg.organization_id,
+            author=alice.device_id,
+            email="zack@example.com",
+        )  # TODO
+    else:  # claim_device
+        token = await backend.invite.new_device(
+            organization_id=coolorg.organization_id, author=alice.device_id
+        )  # TODO
 
     ch = AnonymousClientHandshake(
         organization_id=coolorg.organization_id, operation=operation, token=token
@@ -133,10 +137,54 @@ async def test_anonymous_handshake_good(backend, server_factory, coolorg, operat
 
 @pytest.mark.xfail(reason="API not implemented yet")
 @pytest.mark.trio
-@pytest.mark.parametrize("operation", ["bootstrap_organization", "claim_user", "claim_device"])
+@pytest.mark.parametrize("operation", AnonymousOperation)
 async def test_anonymous_handshake_bad_token(backend, server_factory, coolorg, otherorg, operation):
     ch = AnonymousClientHandshake(
         organization_id=coolorg.organization_id, operation=operation, token="123abc"
+    )
+    async with server_factory(backend.handle_client) as server:
+        stream = server.connection_factory()
+        transport = await Transport.init_for_client(stream, server.addr.hostname)
+
+        challenge_req = await transport.recv()
+        answer_req = ch.process_challenge_req(challenge_req)
+
+        await transport.send(answer_req)
+        result_req = await transport.recv()
+        with pytest.raises(HandshakeRVKMismatch):
+            ch.process_result_req(result_req)
+
+
+@pytest.mark.xfail(reason="API not implemented yet")
+@pytest.mark.trio
+async def test_anonymous_handshake_bad_operation(backend, server_factory, coolorg):
+    ch = AnonymousClientHandshake(
+        organization_id=coolorg.organization_id, operation="DUMMY_OPERATION", token="123abc"
+    )
+    async with server_factory(backend.handle_client) as server:
+        stream = server.connection_factory()
+        transport = await Transport.init_for_client(stream, server.addr.hostname)
+
+        challenge_req = await transport.recv()
+        answer_req = ch.process_challenge_req(challenge_req)
+
+        await transport.send(answer_req)
+        result_req = await transport.recv()
+        with pytest.raises(HandshakeRVKMismatch):
+            ch.process_result_req(result_req)
+
+
+@pytest.mark.xfail(reason="API not implemented yet")
+@pytest.mark.trio
+async def test_anonymous_handshake_bad_token_type(backend, server_factory, coolorg, alice):
+    token = await backend.invite.new_user(
+        organization_id=coolorg.organization_id, author=alice.device_id, email="zack@example.com"
+    )  # TODO
+
+    ch = AnonymousClientHandshake(
+        organization_id=coolorg.organization_id,
+        operation=AnonymousOperation.CLAIM_DEVICE,
+        token=token,
     )
     async with server_factory(backend.handle_client) as server:
         stream = server.connection_factory()
@@ -160,7 +208,7 @@ async def test_handshake_unknown_organization(
     if type == "anonymous":
         ch = AnonymousClientHandshake(
             organization_id=bad_org.organization_id,
-            operation="bootstrap_organization",
+            operation=AnonymousOperation.CLAIM_USER,
             token="whatever",
         )
     else:  # authenticated
@@ -190,7 +238,7 @@ async def test_handshake_expired_organization(backend, server_factory, expiredor
     if type == "anonymous":
         ch = AnonymousClientHandshake(
             organization_id=expiredorg.organization_id,
-            operation="bootstrap_organization",
+            operation=AnonymousOperation.CLAIM_USER,
             token="whatever",
         )
     else:  # authenticated

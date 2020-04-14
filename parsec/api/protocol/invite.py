@@ -1,6 +1,8 @@
 # Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2019 Scille SAS
 
-from parsec.serde import BaseSchema, fields, validate
+from enum import Enum
+
+from parsec.serde import BaseSchema, OneOfSchema, fields
 from parsec.api.protocol.base import BaseReqSchema, BaseRepSchema, CmdSerializer
 
 
@@ -19,27 +21,56 @@ __all__ = (
 )
 
 
-INVITE_TYPES = ["user", "device"]
+class InvitationType(Enum):
+    USER = "USER"
+    DEVICE = "DEVICE"
 
 
-class InviteNewReqSchema(BaseReqSchema):
-    type = fields.String(required=True, validate=validate.OneOf(INVITE_TYPES))
+InvitationTypeField = fields.enum_field_factory(InvitationType)
+
+
+class InviteNewUserReqSchema(BaseRepSchema):
+    type = fields.CheckedConstant(InvitationType.USER, required=True)
     email = fields.String(required=True)
     send_email = fields.Boolean(required=True)
 
 
+class InviteNewDeviceReqSchema(BaseRepSchema):
+    type = fields.CheckedConstant(InvitationType.DEVICE, required=True)
+    send_email = fields.Boolean(required=True)
+
+
+class InviteNewReqSchema(OneOfSchema):
+    type_field = "type"
+    type_field_remove = False
+    type_schemas = {
+        InvitationType.USER: InviteNewUserReqSchema(),
+        InvitationType.DEVICE: InviteNewDeviceReqSchema(),
+    }
+
+    def get_obj_type(self, obj):
+        return obj["type"]
+
+
 class InviteNewRepSchema(BaseRepSchema):
-    token = fields.String(required=True)
+    token = fields.UUID(required=True)
 
 
 invite_new_serializer = CmdSerializer(InviteNewReqSchema, InviteNewRepSchema)
 
 
+class InvitationDeletedReason(Enum):
+    FINISHED = "FINISHED"
+    CANCELLED = "CANCELLED"
+    ROTTEN = "ROTTEN"
+
+
+InvitationDeletedReasonField = fields.enum_field_factory(InvitationDeletedReason)
+
+
 class InviteDeleteReqSchema(BaseReqSchema):
-    token = fields.String(required=True)
-    reason = fields.String(
-        required=True, validate=validate.OneOf(["finished", "cancelled", "rotten"])
-    )
+    token = fields.UUID(required=True)
+    reason = InvitationDeletedReasonField(required=True)
 
 
 class InviteDeleteRepSchema(BaseRepSchema):
@@ -53,11 +84,21 @@ class InviteListReqSchema(BaseReqSchema):
     pass
 
 
+class InvitationStatus(Enum):
+    IDLE = "IDLE"
+    READY = "READY"
+    DELETED = "DELETED"
+
+
+InvitationStatusField = fields.enum_field_factory(InvitationStatus)
+
+
 class InviteListItemSchema(BaseSchema):
-    token = fields.String(required=True)
-    type = fields.String(required=True, validate=validate.OneOf(INVITE_TYPES))
-    status = fields.String(required=True, validate=validate.OneOf(["idle", "ready"]))
+    token = fields.UUID(required=True)
+    type = InvitationTypeField(required=True)
     created = fields.DateTime(required=True)
+    status = InvitationStatusField(required=True)
+    deleted_reason = InvitationDeletedReason(allow_none=True, missing=None)
 
 
 class InviteListRepSchema(BaseRepSchema):
@@ -72,7 +113,7 @@ class InviteInfoReqSchema(BaseReqSchema):
 
 
 class InviteInfoRepSchema(BaseRepSchema):
-    type = fields.String(required=True, validate=validate.OneOf(INVITE_TYPES))
+    type = InvitationTypeField(required=True)
     email = fields.String(required=True)  # Only for user
     inviter_human_email = fields.String(required=True)
     inviter_human_label = fields.String(required=True)
