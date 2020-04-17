@@ -1,6 +1,5 @@
 # Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2019 Scille SAS
 
-import trio
 import pytest
 from pendulum import Pendulum
 
@@ -47,89 +46,175 @@ async def invited_sock(backend, backend_invited_sock_factory, alice, invitation)
 
 
 @pytest.mark.trio
-@pytest.mark.parametrize("order", ["invitee_first", "inviter_first"])
-async def test_conduit_exchange(
-    mock_clock, backend, alice, alice_backend_sock, invitation, invited_sock, order
+async def test_conduit_exchange_invitee_leader(
+    backend, alice, alice_backend_sock, invitation, invited_sock
 ):
-    mock_clock.autojump_threshold = 0
     invitee_privkey = PrivateKey.generate()
     inviter_privkey = PrivateKey.generate()
 
-    async def _do_invitee(sleep_before_req_time):
-        await trio.sleep(sleep_before_req_time)
-        rep = await invite_1_invitee_wait_peer(
-            invited_sock, invitee_public_key=invitee_privkey.public_key
-        )
-        assert rep == {"status": "ok", "inviter_public_key": inviter_privkey.public_key}
+    # Step 1
 
-        await trio.sleep(sleep_before_req_time)
-        rep = await invite_2_invitee_send_hashed_nonce(
-            invited_sock, invitee_hashed_nonce=b"<invitee_hashed_nonce>"
-        )
-        assert rep == {"status": "ok", "inviter_nonce": b"<inviter_nonce>"}
-
-        await trio.sleep(sleep_before_req_time)
-        rep = await invite_2_invitee_send_nonce(invited_sock, invitee_nonce=b"<invitee_nonce>")
-        assert rep == {"status": "ok"}
-
-        await trio.sleep(sleep_before_req_time)
-        rep = await invite_3_invitee_signify_trust(invited_sock)
-        assert rep == {"status": "ok"}
-
-        await trio.sleep(sleep_before_req_time)
-        rep = await invite_3_invitee_wait_peer_trust(invited_sock)
-        assert rep == {"status": "ok"}
-
-        await trio.sleep(sleep_before_req_time)
-        rep = await invite_4_invitee_communicate(invited_sock, payload=None)
-        assert rep == {"status": "ok", "payload": b"<hello from inviter !>"}
-
-        await trio.sleep(sleep_before_req_time)
-        rep = await invite_4_invitee_communicate(invited_sock, payload=b"<hello from invitee !>")
-        assert rep == {"status": "ok", "payload": None}
-
-    async def _do_inviter(sleep_before_req_time):
-        await trio.sleep(sleep_before_req_time)
-        rep = await invite_1_inviter_wait_peer(
+    async with invite_1_invitee_wait_peer.async_call(
+        invited_sock, invitee_public_key=invitee_privkey.public_key
+    ) as invitee_async_rep:
+        inviter_rep = await invite_1_inviter_wait_peer(
             alice_backend_sock,
             token=invitation.token,
             inviter_public_key=inviter_privkey.public_key,
         )
-        assert rep == {"status": "ok", "invitee_public_key": invitee_privkey.public_key}
+        assert inviter_rep == {"status": "ok", "invitee_public_key": invitee_privkey.public_key}
+    assert invitee_async_rep.rep == {
+        "status": "ok",
+        "inviter_public_key": inviter_privkey.public_key,
+    }
 
-        await trio.sleep(sleep_before_req_time)
-        rep = await invite_2_inviter_get_hashed_nonce(alice_backend_sock, token=invitation.token)
-        assert rep == {"status": "ok", "invitee_hashed_nonce": b"<invitee_hashed_nonce>"}
+    # Step 2
 
-        await trio.sleep(sleep_before_req_time)
-        rep = await invite_2_inviter_send_nonce(
-            alice_backend_sock, token=invitation.token, inviter_nonce=b"<inviter_nonce>"
+    async with invite_2_invitee_send_hashed_nonce.async_call(
+        invited_sock, invitee_hashed_nonce=b"<invitee_hashed_nonce>"
+    ) as invitee_async_rep:
+
+        inviter_rep = await invite_2_inviter_get_hashed_nonce(
+            alice_backend_sock, token=invitation.token
         )
-        assert rep == {"status": "ok", "invitee_nonce": b"<invitee_nonce>"}
+        assert inviter_rep == {"status": "ok", "invitee_hashed_nonce": b"<invitee_hashed_nonce>"}
 
-        await trio.sleep(sleep_before_req_time)
-        rep = await invite_3_inviter_wait_peer_trust(alice_backend_sock, token=invitation.token)
-        assert rep == {"status": "ok"}
+        async with invite_2_inviter_send_nonce.async_call(
+            alice_backend_sock, token=invitation.token, inviter_nonce=b"<inviter_nonce>"
+        ) as inviter_async_rep:
 
-        await trio.sleep(sleep_before_req_time)
-        rep = await invite_3_inviter_signify_trust(alice_backend_sock, token=invitation.token)
-        assert rep == {"status": "ok"}
+            await invitee_async_rep.do_recv()
+            assert invitee_async_rep.rep == {"status": "ok", "inviter_nonce": b"<inviter_nonce>"}
 
-        await trio.sleep(sleep_before_req_time)
-        rep = await invite_4_inviter_communicate(
+            invitee_rep = await invite_2_invitee_send_nonce(
+                invited_sock, invitee_nonce=b"<invitee_nonce>"
+            )
+            assert invitee_rep == {"status": "ok"}
+
+        assert inviter_async_rep.rep == {"status": "ok", "invitee_nonce": b"<invitee_nonce>"}
+
+    # Step 3
+
+    async with invite_3_invitee_signify_trust.async_call(invited_sock) as invitee_async_rep:
+        inviter_rep = await invite_3_inviter_wait_peer_trust(
+            alice_backend_sock, token=invitation.token
+        )
+        assert inviter_rep == {"status": "ok"}
+    assert invitee_async_rep.rep == {"status": "ok"}
+
+    async with invite_3_invitee_wait_peer_trust.async_call(invited_sock) as invitee_async_rep:
+        inviter_rep = await invite_3_inviter_signify_trust(
+            alice_backend_sock, token=invitation.token
+        )
+        assert inviter_rep == {"status": "ok"}
+    assert invitee_async_rep.rep == {"status": "ok"}
+
+    # Step 4
+
+    async with invite_4_invitee_communicate.async_call(
+        invited_sock, payload=None
+    ) as invitee_async_rep:
+        inviter_rep = await invite_4_inviter_communicate(
             alice_backend_sock, token=invitation.token, payload=b"<hello from inviter !>"
         )
-        assert rep == {"status": "ok", "payload": None}
+        assert inviter_rep == {"status": "ok", "payload": None}
+    assert invitee_async_rep.rep == {"status": "ok", "payload": b"<hello from inviter !>"}
 
-        await trio.sleep(sleep_before_req_time)
-        rep = await invite_4_inviter_communicate(
-            alice_backend_sock, token=invitation.token, payload=None
+    async with invite_4_inviter_communicate.async_call(
+        alice_backend_sock, token=invitation.token, payload=None
+    ) as inviter_async_rep:
+        invitee_rep = await invite_4_invitee_communicate(
+            invited_sock, payload=b"<hello from invitee !>"
         )
-        assert rep == {"status": "ok", "payload": b"<hello from invitee !>"}
+        assert invitee_rep == {"status": "ok", "payload": None}
+    assert inviter_async_rep.rep == {"status": "ok", "payload": b"<hello from invitee !>"}
 
-    async with trio.open_nursery() as nursery:
-        invitee_sleep_before_req_time = 0 if order == "invitee_first" else 1
-        inviter_sleep_before_req_time = 0 if order == "inviter_first" else 1
 
-        nursery.start_soon(_do_invitee, invitee_sleep_before_req_time)
-        nursery.start_soon(_do_inviter, inviter_sleep_before_req_time)
+@pytest.mark.trio
+async def test_conduit_exchange_inviter_leader(
+    backend, alice, alice_backend_sock, invitation, invited_sock
+):
+    invitee_privkey = PrivateKey.generate()
+    inviter_privkey = PrivateKey.generate()
+
+    # Step 1
+
+    async with invite_1_inviter_wait_peer.async_call(
+        alice_backend_sock, token=invitation.token, inviter_public_key=inviter_privkey.public_key
+    ) as inviter_async_rep:
+        invitee_rep = await invite_1_invitee_wait_peer(
+            invited_sock, invitee_public_key=invitee_privkey.public_key
+        )
+        assert invitee_rep == {"status": "ok", "inviter_public_key": inviter_privkey.public_key}
+    assert inviter_async_rep.rep == {
+        "status": "ok",
+        "invitee_public_key": invitee_privkey.public_key,
+    }
+
+    # Step 2
+
+    async with invite_2_inviter_get_hashed_nonce.async_call(
+        alice_backend_sock, token=invitation.token
+    ) as inviter_async_rep:
+        async with invite_2_invitee_send_hashed_nonce.async_call(
+            invited_sock, invitee_hashed_nonce=b"<invitee_hashed_nonce>"
+        ) as invitee_async_rep:
+
+            await inviter_async_rep.do_recv()
+            assert inviter_async_rep.rep == {
+                "status": "ok",
+                "invitee_hashed_nonce": b"<invitee_hashed_nonce>",
+            }
+
+            async with invite_2_inviter_send_nonce.async_call(
+                alice_backend_sock, token=invitation.token, inviter_nonce=b"<inviter_nonce>"
+            ) as inviter_async_rep:
+
+                await invitee_async_rep.do_recv()
+                assert invitee_async_rep.rep == {
+                    "status": "ok",
+                    "inviter_nonce": b"<inviter_nonce>",
+                }
+
+                invitee_rep = await invite_2_invitee_send_nonce(
+                    invited_sock, invitee_nonce=b"<invitee_nonce>"
+                )
+                assert invitee_rep == {"status": "ok"}
+
+            assert inviter_async_rep.rep == {"status": "ok", "invitee_nonce": b"<invitee_nonce>"}
+
+    # Step 3
+
+    async with invite_3_inviter_wait_peer_trust.async_call(
+        alice_backend_sock, token=invitation.token
+    ) as inviter_async_rep:
+        invitee_rep = await invite_3_invitee_signify_trust(invited_sock)
+        assert invitee_rep == {"status": "ok"}
+    assert inviter_async_rep.rep == {"status": "ok"}
+
+    async with invite_3_inviter_signify_trust.async_call(
+        alice_backend_sock, token=invitation.token
+    ) as inviter_async_rep:
+        invitee_rep = await invite_3_invitee_wait_peer_trust(invited_sock)
+        assert invitee_rep == {"status": "ok"}
+    assert inviter_async_rep.rep == {"status": "ok"}
+
+    # Step 4
+
+    async with invite_4_inviter_communicate.async_call(
+        alice_backend_sock, token=invitation.token, payload=None
+    ) as inviter_async_rep:
+        invitee_rep = await invite_4_invitee_communicate(
+            invited_sock, payload=b"<hello from invitee !>"
+        )
+        assert invitee_rep == {"status": "ok", "payload": None}
+    assert inviter_async_rep.rep == {"status": "ok", "payload": b"<hello from invitee !>"}
+
+    async with invite_4_invitee_communicate.async_call(
+        invited_sock, payload=None
+    ) as invitee_async_rep:
+        inviter_rep = await invite_4_inviter_communicate(
+            alice_backend_sock, token=invitation.token, payload=b"<hello from inviter !>"
+        )
+        assert inviter_rep == {"status": "ok", "payload": None}
+    assert invitee_async_rep.rep == {"status": "ok", "payload": b"<hello from inviter !>"}

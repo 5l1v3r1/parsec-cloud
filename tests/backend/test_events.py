@@ -56,11 +56,11 @@ async def test_event_resubscribe(backend, alice_backend_sock, alice2_backend_soc
 
 @pytest.mark.trio
 @pytest.mark.postgresql
-async def test_cross_backend_event(backend_factory, backend_sock_factory, alice, bob):
+async def test_cross_backend_event(backend_factory, apiv2_backend_sock_factory, alice, bob):
     async with backend_factory() as backend_1, backend_factory(populated=False) as backend_2:
-        async with backend_sock_factory(backend_1, alice) as alice_sock, backend_sock_factory(
-            backend_2, bob
-        ) as bob_sock:
+        async with apiv2_backend_sock_factory(
+            backend_1, alice
+        ) as alice_sock, apiv2_backend_sock_factory(backend_2, bob) as bob_sock:
 
             await events_subscribe(alice_sock)
 

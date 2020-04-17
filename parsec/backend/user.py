@@ -226,7 +226,10 @@ class BaseUserComponent:
             }
         )
 
-    @api("human_find", handshake_types=[HandshakeType.AUTHENTICATED])
+    @api(
+        "human_find",
+        handshake_types=[HandshakeType.AUTHENTICATED, APIV1_HandshakeType.AUTHENTICATED],
+    )
     @catch_protocol_errors
     async def api_human_find(self, client_ctx, msg):
         msg = human_find_serializer.req_load(msg)
