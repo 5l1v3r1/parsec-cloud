@@ -33,14 +33,14 @@ from parsec.api.protocol import (
     invite_info_serializer,
     invite_1_invitee_wait_peer_serializer,
     invite_1_inviter_wait_peer_serializer,
-    invite_2_invitee_send_hashed_nonce_serializer,
-    invite_2_inviter_get_hashed_nonce_serializer,
-    invite_2_inviter_send_nonce_serializer,
-    invite_2_invitee_send_nonce_serializer,
-    invite_3_inviter_wait_peer_trust_serializer,
-    invite_3_invitee_wait_peer_trust_serializer,
-    invite_3_inviter_signify_trust_serializer,
-    invite_3_invitee_signify_trust_serializer,
+    invite_2a_invitee_send_hashed_nonce_serializer,
+    invite_2a_inviter_get_hashed_nonce_serializer,
+    invite_2b_inviter_send_nonce_serializer,
+    invite_2b_invitee_send_nonce_serializer,
+    invite_3a_inviter_wait_peer_trust_serializer,
+    invite_3a_invitee_signify_trust_serializer,
+    invite_3b_invitee_wait_peer_trust_serializer,
+    invite_3b_inviter_signify_trust_serializer,
     invite_4_inviter_communicate_serializer,
     invite_4_invitee_communicate_serializer,
 )
@@ -329,41 +329,41 @@ invite_1_inviter_wait_peer = CmdSock(
         "inviter_public_key": inviter_public_key,
     },
 )
-invite_2_invitee_send_hashed_nonce = CmdSock(
-    "invite_2_invitee_send_hashed_nonce",
-    invite_2_invitee_send_hashed_nonce_serializer,
+invite_2a_invitee_send_hashed_nonce = CmdSock(
+    "invite_2a_invitee_send_hashed_nonce",
+    invite_2a_invitee_send_hashed_nonce_serializer,
     parse_args=lambda self, invitee_hashed_nonce: {"invitee_hashed_nonce": invitee_hashed_nonce},
 )
-invite_2_inviter_get_hashed_nonce = CmdSock(
-    "invite_2_inviter_get_hashed_nonce",
-    invite_2_inviter_get_hashed_nonce_serializer,
+invite_2a_inviter_get_hashed_nonce = CmdSock(
+    "invite_2a_inviter_get_hashed_nonce",
+    invite_2a_inviter_get_hashed_nonce_serializer,
     parse_args=lambda self, token: {"token": token},
 )
-invite_2_inviter_send_nonce = CmdSock(
-    "invite_2_inviter_send_nonce",
-    invite_2_inviter_send_nonce_serializer,
+invite_2b_inviter_send_nonce = CmdSock(
+    "invite_2b_inviter_send_nonce",
+    invite_2b_inviter_send_nonce_serializer,
     parse_args=lambda self, token, inviter_nonce: {"token": token, "inviter_nonce": inviter_nonce},
 )
-invite_2_invitee_send_nonce = CmdSock(
-    "invite_2_invitee_send_nonce",
-    invite_2_invitee_send_nonce_serializer,
+invite_2b_invitee_send_nonce = CmdSock(
+    "invite_2b_invitee_send_nonce",
+    invite_2b_invitee_send_nonce_serializer,
     parse_args=lambda self, invitee_nonce: {"invitee_nonce": invitee_nonce},
 )
-invite_3_inviter_wait_peer_trust = CmdSock(
-    "invite_3_inviter_wait_peer_trust",
-    invite_3_inviter_wait_peer_trust_serializer,
+invite_3a_inviter_wait_peer_trust = CmdSock(
+    "invite_3a_inviter_wait_peer_trust",
+    invite_3a_inviter_wait_peer_trust_serializer,
     parse_args=lambda self, token: {"token": token},
 )
-invite_3_invitee_wait_peer_trust = CmdSock(
-    "invite_3_invitee_wait_peer_trust", invite_3_invitee_wait_peer_trust_serializer
+invite_3a_invitee_signify_trust = CmdSock(
+    "invite_3a_invitee_signify_trust", invite_3a_invitee_signify_trust_serializer
 )
-invite_3_inviter_signify_trust = CmdSock(
-    "invite_3_inviter_signify_trust",
-    invite_3_inviter_signify_trust_serializer,
+invite_3b_invitee_wait_peer_trust = CmdSock(
+    "invite_3b_invitee_wait_peer_trust", invite_3b_invitee_wait_peer_trust_serializer
+)
+invite_3b_inviter_signify_trust = CmdSock(
+    "invite_3b_inviter_signify_trust",
+    invite_3b_inviter_signify_trust_serializer,
     parse_args=lambda self, token: {"token": token},
-)
-invite_3_invitee_signify_trust = CmdSock(
-    "invite_3_invitee_signify_trust", invite_3_invitee_signify_trust_serializer
 )
 invite_4_inviter_communicate = CmdSock(
     "invite_4_inviter_communicate",

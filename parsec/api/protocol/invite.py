@@ -14,14 +14,14 @@ __all__ = (
     "invite_info_serializer",
     "invite_1_invitee_wait_peer_serializer",
     "invite_1_inviter_wait_peer_serializer",
-    "invite_2_invitee_send_hashed_nonce_serializer",
-    "invite_2_inviter_get_hashed_nonce_serializer",
-    "invite_2_inviter_send_nonce_serializer",
-    "invite_2_invitee_send_nonce_serializer",
-    "invite_3_inviter_wait_peer_trust_serializer",
-    "invite_3_invitee_wait_peer_trust_serializer",
-    "invite_3_inviter_signify_trust_serializer",
-    "invite_3_invitee_signify_trust_serializer",
+    "invite_2a_invitee_send_hashed_nonce_serializer",
+    "invite_2a_inviter_get_hashed_nonce_serializer",
+    "invite_2b_inviter_send_nonce_serializer",
+    "invite_2b_invitee_send_nonce_serializer",
+    "invite_3a_inviter_wait_peer_trust_serializer",
+    "invite_3b_invitee_wait_peer_trust_serializer",
+    "invite_3a_invitee_signify_trust_serializer",
+    "invite_3b_inviter_signify_trust_serializer",
     "invite_4_inviter_communicate_serializer",
     "invite_4_invitee_communicate_serializer",
 )
@@ -196,108 +196,109 @@ invite_1_inviter_wait_peer_serializer = CmdSerializer(
 )
 
 
-class Invite2InviteeSendHashedNonceHashNonceReqSchema(BaseReqSchema):
+class Invite2aInviteeSendHashedNonceHashNonceReqSchema(BaseReqSchema):
     invitee_hashed_nonce = fields.Bytes(required=True)
 
 
-class Invite2InviteeSendHashedNonceHashNonceRepSchema(BaseRepSchema):
+class Invite2aInviteeSendHashedNonceHashNonceRepSchema(BaseRepSchema):
     inviter_nonce = fields.Bytes(required=True)
 
 
-invite_2_invitee_send_hashed_nonce_serializer = CmdSerializer(
-    Invite2InviteeSendHashedNonceHashNonceReqSchema, Invite2InviteeSendHashedNonceHashNonceRepSchema
+invite_2a_invitee_send_hashed_nonce_serializer = CmdSerializer(
+    Invite2aInviteeSendHashedNonceHashNonceReqSchema,
+    Invite2aInviteeSendHashedNonceHashNonceRepSchema,
 )
 
 
-class Invite2InviterGetHashedNonceReqSchema(BaseReqSchema):
+class Invite2aInviterGetHashedNonceReqSchema(BaseReqSchema):
     token = fields.UUID(required=True)
 
 
-class Invite2InviterGetHashedNonceRepSchema(BaseRepSchema):
+class Invite2aInviterGetHashedNonceRepSchema(BaseRepSchema):
     invitee_hashed_nonce = fields.Bytes(required=True)
 
 
-invite_2_inviter_get_hashed_nonce_serializer = CmdSerializer(
-    Invite2InviterGetHashedNonceReqSchema, Invite2InviterGetHashedNonceRepSchema
+invite_2a_inviter_get_hashed_nonce_serializer = CmdSerializer(
+    Invite2aInviterGetHashedNonceReqSchema, Invite2aInviterGetHashedNonceRepSchema
 )
 
 
-class Invite2InviterSendNonceReqSchema(BaseReqSchema):
+class Invite2bInviterSendNonceReqSchema(BaseReqSchema):
     token = fields.UUID(required=True)
     inviter_nonce = fields.Bytes(required=True)
 
 
-class Invite2InviterSendNonceRepSchema(BaseRepSchema):
+class Invite2bInviterSendNonceRepSchema(BaseRepSchema):
     invitee_nonce = fields.Bytes(required=True)
 
 
-invite_2_inviter_send_nonce_serializer = CmdSerializer(
-    Invite2InviterSendNonceReqSchema, Invite2InviterSendNonceRepSchema
+invite_2b_inviter_send_nonce_serializer = CmdSerializer(
+    Invite2bInviterSendNonceReqSchema, Invite2bInviterSendNonceRepSchema
 )
 
 
-class Invite2InviteeSendNonceReqSchema(BaseReqSchema):
+class Invite2bInviteeSendNonceReqSchema(BaseReqSchema):
     invitee_nonce = fields.Bytes(required=True)
 
 
-class Invite2InviteeSendNonceRepSchema(BaseRepSchema):
+class Invite2bInviteeSendNonceRepSchema(BaseRepSchema):
     pass
 
 
-invite_2_invitee_send_nonce_serializer = CmdSerializer(
-    Invite2InviteeSendNonceReqSchema, Invite2InviteeSendNonceRepSchema
+invite_2b_invitee_send_nonce_serializer = CmdSerializer(
+    Invite2bInviteeSendNonceReqSchema, Invite2bInviteeSendNonceRepSchema
 )
 
 
-class Invite3InviterWaitPeerTrustReqSchema(BaseReqSchema):
+class Invite3aInviterWaitPeerTrustReqSchema(BaseReqSchema):
     token = fields.UUID(required=True)
 
 
-class Invite3InviterWaitPeerTrustRepSchema(BaseRepSchema):
+class Invite3aInviterWaitPeerTrustRepSchema(BaseRepSchema):
     pass
 
 
-invite_3_inviter_wait_peer_trust_serializer = CmdSerializer(
-    Invite3InviterWaitPeerTrustReqSchema, Invite3InviterWaitPeerTrustRepSchema
+invite_3a_inviter_wait_peer_trust_serializer = CmdSerializer(
+    Invite3aInviterWaitPeerTrustReqSchema, Invite3aInviterWaitPeerTrustRepSchema
 )
 
 
-class Invite3InviteeWaitPeerTrustReqSchema(BaseReqSchema):
+class Invite3bInviteeWaitPeerTrustReqSchema(BaseReqSchema):
     pass
 
 
-class Invite3InviteeWaitPeerTrustRepSchema(BaseRepSchema):
+class Invite3bInviteeWaitPeerTrustRepSchema(BaseRepSchema):
     pass
 
 
-invite_3_invitee_wait_peer_trust_serializer = CmdSerializer(
-    Invite3InviteeWaitPeerTrustReqSchema, Invite3InviteeWaitPeerTrustRepSchema
+invite_3b_invitee_wait_peer_trust_serializer = CmdSerializer(
+    Invite3bInviteeWaitPeerTrustReqSchema, Invite3bInviteeWaitPeerTrustRepSchema
 )
 
 
-class Invite3InviterSignifyTrustReqSchema(BaseReqSchema):
+class Invite3bInviterSignifyTrustReqSchema(BaseReqSchema):
     token = fields.UUID(required=True)
 
 
-class Invite3InviterSignifyTrustRepSchema(BaseRepSchema):
+class Invite3bInviterSignifyTrustRepSchema(BaseRepSchema):
     pass
 
 
-invite_3_inviter_signify_trust_serializer = CmdSerializer(
-    Invite3InviterSignifyTrustReqSchema, Invite3InviterSignifyTrustRepSchema
+invite_3b_inviter_signify_trust_serializer = CmdSerializer(
+    Invite3bInviterSignifyTrustReqSchema, Invite3bInviterSignifyTrustRepSchema
 )
 
 
-class Invite3InviteeSignifyTrustReqSchema(BaseReqSchema):
+class Invite3aInviteeSignifyTrustReqSchema(BaseReqSchema):
     pass
 
 
-class Invite3InviteeSignifyTrustRepSchema(BaseRepSchema):
+class Invite3aInviteeSignifyTrustRepSchema(BaseRepSchema):
     pass
 
 
-invite_3_invitee_signify_trust_serializer = CmdSerializer(
-    Invite3InviteeSignifyTrustReqSchema, Invite3InviteeSignifyTrustRepSchema
+invite_3a_invitee_signify_trust_serializer = CmdSerializer(
+    Invite3aInviteeSignifyTrustReqSchema, Invite3aInviteeSignifyTrustRepSchema
 )
 
 

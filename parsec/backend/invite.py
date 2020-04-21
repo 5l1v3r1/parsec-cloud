@@ -20,14 +20,14 @@ from parsec.api.protocol import (
     invite_info_serializer,
     invite_1_invitee_wait_peer_serializer,
     invite_1_inviter_wait_peer_serializer,
-    invite_2_invitee_send_hashed_nonce_serializer,
-    invite_2_inviter_get_hashed_nonce_serializer,
-    invite_2_inviter_send_nonce_serializer,
-    invite_2_invitee_send_nonce_serializer,
-    invite_3_inviter_wait_peer_trust_serializer,
-    invite_3_invitee_wait_peer_trust_serializer,
-    invite_3_inviter_signify_trust_serializer,
-    invite_3_invitee_signify_trust_serializer,
+    invite_2a_invitee_send_hashed_nonce_serializer,
+    invite_2a_inviter_get_hashed_nonce_serializer,
+    invite_2b_inviter_send_nonce_serializer,
+    invite_2b_invitee_send_nonce_serializer,
+    invite_3a_inviter_wait_peer_trust_serializer,
+    invite_3a_invitee_signify_trust_serializer,
+    invite_3b_invitee_wait_peer_trust_serializer,
+    invite_3b_inviter_signify_trust_serializer,
     invite_4_inviter_communicate_serializer,
     invite_4_invitee_communicate_serializer,
 )
@@ -273,10 +273,10 @@ class BaseInviteComponent:
             {"status": "ok", "invitee_public_key": invitee_public_key}
         )
 
-    @api("invite_2_invitee_send_hashed_nonce", handshake_types=[HandshakeType.INVITED])
+    @api("invite_2a_invitee_send_hashed_nonce", handshake_types=[HandshakeType.INVITED])
     @catch_protocol_errors
-    async def api_invite_2_invitee_send_hashed_nonce(self, client_ctx, msg):
-        msg = invite_2_invitee_send_hashed_nonce_serializer.req_load(msg)
+    async def api_invite_2a_invitee_send_hashed_nonce(self, client_ctx, msg):
+        msg = invite_2a_invitee_send_hashed_nonce_serializer.req_load(msg)
 
         try:
             await self.conduit_invitee_talk(
@@ -301,14 +301,14 @@ class BaseInviteComponent:
         except InvitationInvalidStateError:
             return {"status": "invalid_state"}
 
-        return invite_2_invitee_send_hashed_nonce_serializer.rep_dump(
+        return invite_2a_invitee_send_hashed_nonce_serializer.rep_dump(
             {"status": "ok", "inviter_nonce": inviter_nonce}
         )
 
-    @api("invite_2_inviter_get_hashed_nonce", handshake_types=[HandshakeType.AUTHENTICATED])
+    @api("invite_2a_inviter_get_hashed_nonce", handshake_types=[HandshakeType.AUTHENTICATED])
     @catch_protocol_errors
-    async def api_invite_2_inviter_get_hashed_nonce(self, client_ctx, msg):
-        msg = invite_2_inviter_get_hashed_nonce_serializer.req_load(msg)
+    async def api_invite_2a_inviter_get_hashed_nonce(self, client_ctx, msg):
+        msg = invite_2a_inviter_get_hashed_nonce_serializer.req_load(msg)
 
         try:
             invitee_hashed_nonce = await self.conduit_inviter_talk(
@@ -326,14 +326,14 @@ class BaseInviteComponent:
         except InvitationInvalidStateError:
             return {"status": "invalid_state"}
 
-        return invite_2_inviter_get_hashed_nonce_serializer.rep_dump(
+        return invite_2a_inviter_get_hashed_nonce_serializer.rep_dump(
             {"status": "ok", "invitee_hashed_nonce": invitee_hashed_nonce}
         )
 
-    @api("invite_2_inviter_send_nonce", handshake_types=[HandshakeType.AUTHENTICATED])
+    @api("invite_2b_inviter_send_nonce", handshake_types=[HandshakeType.AUTHENTICATED])
     @catch_protocol_errors
-    async def api_invite_2_inviter_send_nonce(self, client_ctx, msg):
-        msg = invite_2_inviter_send_nonce_serializer.req_load(msg)
+    async def api_invite_2b_inviter_send_nonce(self, client_ctx, msg):
+        msg = invite_2b_inviter_send_nonce_serializer.req_load(msg)
 
         try:
             await self.conduit_inviter_talk(
@@ -358,14 +358,14 @@ class BaseInviteComponent:
         except InvitationInvalidStateError:
             return {"status": "invalid_state"}
 
-        return invite_2_inviter_send_nonce_serializer.rep_dump(
+        return invite_2b_inviter_send_nonce_serializer.rep_dump(
             {"status": "ok", "invitee_nonce": invitee_nonce}
         )
 
-    @api("invite_2_invitee_send_nonce", handshake_types=[HandshakeType.INVITED])
+    @api("invite_2b_invitee_send_nonce", handshake_types=[HandshakeType.INVITED])
     @catch_protocol_errors
-    async def api_invite_2_invitee_send_nonce(self, client_ctx, msg):
-        msg = invite_2_invitee_send_nonce_serializer.req_load(msg)
+    async def api_invite_2b_invitee_send_nonce(self, client_ctx, msg):
+        msg = invite_2b_invitee_send_nonce_serializer.req_load(msg)
 
         try:
             await self.conduit_invitee_talk(
@@ -384,12 +384,12 @@ class BaseInviteComponent:
         except InvitationInvalidStateError:
             return {"status": "invalid_state"}
 
-        return invite_2_invitee_send_nonce_serializer.rep_dump({"status": "ok"})
+        return invite_2b_invitee_send_nonce_serializer.rep_dump({"status": "ok"})
 
-    @api("invite_3_inviter_wait_peer_trust", handshake_types=[HandshakeType.AUTHENTICATED])
+    @api("invite_3a_inviter_wait_peer_trust", handshake_types=[HandshakeType.AUTHENTICATED])
     @catch_protocol_errors
-    async def api_invite_3_inviter_wait_peer_trust(self, client_ctx, msg):
-        msg = invite_3_inviter_wait_peer_trust_serializer.req_load(msg)
+    async def api_invite_3a_inviter_wait_peer_trust(self, client_ctx, msg):
+        msg = invite_3a_inviter_wait_peer_trust_serializer.req_load(msg)
 
         try:
             await self.conduit_inviter_talk(
@@ -407,12 +407,12 @@ class BaseInviteComponent:
         except InvitationInvalidStateError:
             return {"status": "invalid_state"}
 
-        return invite_3_inviter_wait_peer_trust_serializer.rep_dump({"status": "ok"})
+        return invite_3a_inviter_wait_peer_trust_serializer.rep_dump({"status": "ok"})
 
-    @api("invite_3_invitee_wait_peer_trust", handshake_types=[HandshakeType.INVITED])
+    @api("invite_3b_invitee_wait_peer_trust", handshake_types=[HandshakeType.INVITED])
     @catch_protocol_errors
-    async def api_invite_3_invitee_wait_peer_trust(self, client_ctx, msg):
-        msg = invite_3_invitee_wait_peer_trust_serializer.req_load(msg)
+    async def api_invite_3b_invitee_wait_peer_trust(self, client_ctx, msg):
+        msg = invite_3b_invitee_wait_peer_trust_serializer.req_load(msg)
 
         try:
             await self.conduit_invitee_talk(
@@ -430,12 +430,12 @@ class BaseInviteComponent:
         except InvitationInvalidStateError:
             return {"status": "invalid_state"}
 
-        return invite_3_invitee_wait_peer_trust_serializer.rep_dump({"status": "ok"})
+        return invite_3b_invitee_wait_peer_trust_serializer.rep_dump({"status": "ok"})
 
-    @api("invite_3_inviter_signify_trust", handshake_types=[HandshakeType.AUTHENTICATED])
+    @api("invite_3b_inviter_signify_trust", handshake_types=[HandshakeType.AUTHENTICATED])
     @catch_protocol_errors
-    async def api_invite_3_inviter_signify_trust(self, client_ctx, msg):
-        msg = invite_3_inviter_signify_trust_serializer.req_load(msg)
+    async def api_invite_3b_inviter_signify_trust(self, client_ctx, msg):
+        msg = invite_3b_inviter_signify_trust_serializer.req_load(msg)
 
         try:
             await self.conduit_inviter_talk(
@@ -453,12 +453,12 @@ class BaseInviteComponent:
         except InvitationInvalidStateError:
             return {"status": "invalid_state"}
 
-        return invite_3_inviter_signify_trust_serializer.rep_dump({"status": "ok"})
+        return invite_3b_inviter_signify_trust_serializer.rep_dump({"status": "ok"})
 
-    @api("invite_3_invitee_signify_trust", handshake_types=[HandshakeType.INVITED])
+    @api("invite_3a_invitee_signify_trust", handshake_types=[HandshakeType.INVITED])
     @catch_protocol_errors
-    async def api_invite_3_invitee_signify_trust(self, client_ctx, msg):
-        msg = invite_3_invitee_signify_trust_serializer.req_load(msg)
+    async def api_invite_3a_invitee_signify_trust(self, client_ctx, msg):
+        msg = invite_3a_invitee_signify_trust_serializer.req_load(msg)
 
         try:
             await self.conduit_invitee_talk(
@@ -476,7 +476,7 @@ class BaseInviteComponent:
         except InvitationInvalidStateError:
             return {"status": "invalid_state"}
 
-        return invite_3_invitee_signify_trust_serializer.rep_dump({"status": "ok"})
+        return invite_3a_invitee_signify_trust_serializer.rep_dump({"status": "ok"})
 
     @api("invite_4_inviter_communicate", handshake_types=[HandshakeType.AUTHENTICATED])
     @catch_protocol_errors
