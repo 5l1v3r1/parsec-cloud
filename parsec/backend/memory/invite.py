@@ -73,15 +73,26 @@ class MemoryInviteComponent(BaseInviteComponent):
         if not conduit:
             conduit = org.conduits[token] = Conduit()
 
-        if conduit.state != state:
-            raise InvitationInvalidStateError()
-
         if is_inviter:
             send_channel = conduit.inviter_send_channel
             recv_channel = conduit.inviter_recv_channel
         else:
             send_channel = conduit.invitee_send_channel
             recv_channel = conduit.invitee_recv_channel
+
+        if conduit.state != state:
+            if state == ConduitState.STATE_1_WAIT_PEERS:
+                # We are asked to reset the conduit
+                conduit.state = ConduitState.STATE_1_WAIT_PEERS
+                # If a peer is waiting, lure him into thinking we have answered
+                # so he will realise the conduit has been reseted
+                try:
+                    recv_channel.receive_nowait()
+                    await send_channel.send(None)
+                except trio.WouldBlock:
+                    pass
+            else:
+                raise InvitationInvalidStateError()
 
         next_state = NEXT_CONDUIT_STATE[conduit.state]
         try:
@@ -95,6 +106,9 @@ class MemoryInviteComponent(BaseInviteComponent):
             # We are first, block until the peer is here
             await send_channel.send(payload)
             peer_payload = await recv_channel.receive()
+            # Make sure peer hasn't reset the conduit while we were waiting
+            if conduit.state != state:
+                raise InvitationInvalidStateError()
             # Prepare for next state and signify the current state is done to peer
             conduit.state = NEXT_CONDUIT_STATE[conduit.state]
             await send_channel.send(None)
