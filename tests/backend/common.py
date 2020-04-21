@@ -1,7 +1,6 @@
 # Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2019 Scille SAS
 
 import trio
-from uuid import UUID
 from functools import partial
 from pendulum import now as pendulum_now
 from async_generator import asynccontextmanager
@@ -46,11 +45,6 @@ from parsec.api.protocol import (
 )
 
 
-VLOB_ID = UUID("10000000000000000000000000000000")
-REALM_ID = UUID("20000000000000000000000000000000")
-OTHER_VLOB_ID = UUID("30000000000000000000000000000000")
-
-
 class CmdSock:
     def __init__(self, cmd, serializer, parse_args=lambda self: {}, check_rep_by_default=False):
         self.cmd = cmd
@@ -90,8 +84,8 @@ class CmdSock:
 
         async def do_recv(self):
             assert not self.rep_done
-            self._rep = await self._do_recv()
             self.rep_done = True
+            self._rep = await self._do_recv()
 
     @asynccontextmanager
     async def async_call(self, sock, *args, **kwargs):

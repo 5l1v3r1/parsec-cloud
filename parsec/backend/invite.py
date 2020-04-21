@@ -255,6 +255,7 @@ class BaseInviteComponent:
         try:
             invitee_public_key = await self.conduit_inviter_talk(
                 organization_id=client_ctx.organization_id,
+                inviter=client_ctx.user_id,
                 token=msg["token"],
                 state=ConduitState.STATE_1_WAIT_PEERS,
                 payload=msg["inviter_public_key"],
@@ -313,6 +314,7 @@ class BaseInviteComponent:
         try:
             invitee_hashed_nonce = await self.conduit_inviter_talk(
                 organization_id=client_ctx.organization_id,
+                inviter=client_ctx.user_id,
                 token=msg["token"],
                 state=ConduitState.STATE_2_1_INVITEE_HASHED_NONCE,
             )
@@ -338,6 +340,7 @@ class BaseInviteComponent:
         try:
             await self.conduit_inviter_talk(
                 organization_id=client_ctx.organization_id,
+                inviter=client_ctx.user_id,
                 token=msg["token"],
                 state=ConduitState.STATE_2_2_INVITER_NONCE,
                 payload=msg["inviter_nonce"],
@@ -345,6 +348,7 @@ class BaseInviteComponent:
 
             invitee_nonce = await self.conduit_inviter_talk(
                 organization_id=client_ctx.organization_id,
+                inviter=client_ctx.user_id,
                 token=msg["token"],
                 state=ConduitState.STATE_2_3_INVITEE_NONCE,
             )
@@ -394,6 +398,7 @@ class BaseInviteComponent:
         try:
             await self.conduit_inviter_talk(
                 organization_id=client_ctx.organization_id,
+                inviter=client_ctx.user_id,
                 token=msg["token"],
                 state=ConduitState.STATE_3_1_INVITEE_TRUST,
             )
@@ -440,6 +445,7 @@ class BaseInviteComponent:
         try:
             await self.conduit_inviter_talk(
                 organization_id=client_ctx.organization_id,
+                inviter=client_ctx.user_id,
                 token=msg["token"],
                 state=ConduitState.STATE_3_2_INVITER_TRUST,
             )
@@ -486,6 +492,7 @@ class BaseInviteComponent:
         try:
             answer_payload = await self.conduit_inviter_talk(
                 organization_id=client_ctx.organization_id,
+                inviter=client_ctx.user_id,
                 token=msg["token"],
                 state=ConduitState.STATE_4_COMMUNICATE,
                 payload=msg["payload"],
@@ -542,6 +549,7 @@ class BaseInviteComponent:
     async def conduit_inviter_talk(
         self,
         organization_id: OrganizationID,
+        inviter: UserID,
         token: UUID,
         state: ConduitState,
         payload: Optional[bytes] = None,

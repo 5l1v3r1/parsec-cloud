@@ -49,16 +49,21 @@ class MemoryInviteComponent(BaseInviteComponent):
         state: ConduitState,
         payload: Optional[bytes] = None,
     ) -> bytes:
-        return await self._conduit_talk(organization_id, token, state, payload, is_inviter=False)
+        return await self._conduit_talk(
+            organization_id, token, state, payload, is_inviter=False, inviter=None
+        )
 
     async def conduit_inviter_talk(
         self,
         organization_id: OrganizationID,
+        inviter: UserID,
         token: UUID,
         state: ConduitState,
         payload: Optional[bytes] = None,
     ) -> bytes:
-        return await self._conduit_talk(organization_id, token, state, payload, is_inviter=True)
+        return await self._conduit_talk(
+            organization_id, token, state, payload, is_inviter=True, inviter=inviter
+        )
 
     async def _conduit_talk(
         self,
@@ -67,8 +72,16 @@ class MemoryInviteComponent(BaseInviteComponent):
         state: ConduitState,
         payload: Optional[bytes],
         is_inviter: bool,
+        inviter: Optional[UserID],
     ) -> bytes:
         org = self._organizations[organization_id]
+        invitation = org.invitations.get(token)
+        if not invitation or (is_inviter and invitation.inviter_user_id != inviter):
+            raise InvitationNotFoundError(token)
+        if invitation.status == InvitationStatus.DELETED:
+            raise InvitationAlreadyDeletedError(token)
+        if not is_inviter and state == ConduitState.STATE_1_WAIT_PEERS:
+            org.invitations[token] = invitation.evolve(status=InvitationStatus.READY)
         conduit = org.conduits.get(token)
         if not conduit:
             conduit = org.conduits[token] = Conduit()
@@ -143,7 +156,7 @@ class MemoryInviteComponent(BaseInviteComponent):
             organization_id=organization_id,
             inviter=inviter,
             token=token,
-            is_deleted=True,
+            status=InvitationStatus.DELETED,
         )
 
     async def list(self, organization_id: OrganizationID, inviter: UserID) -> List[Invitation]:

@@ -19,10 +19,10 @@ AUTHENTICATED_CMDS = {
     "invite_delete",
     "invite_list",
     "invite_1_inviter_wait_peer",
-    "invite_2_inviter_get_hashed_nonce",
-    "invite_2_inviter_send_nonce",
-    "invite_3_inviter_wait_peer_trust",
-    "invite_3_inviter_signify_trust",
+    "invite_2a_inviter_get_hashed_nonce",
+    "invite_2b_inviter_send_nonce",
+    "invite_3a_inviter_wait_peer_trust",
+    "invite_3b_inviter_signify_trust",
     "invite_4_inviter_communicate",
     # Block
     "block_create",
@@ -47,10 +47,10 @@ INVITED_CMDS = {
     "ping",  # TODO: remove ping and ping event (only have them in tests)
     "invite_info",
     "invite_1_invitee_wait_peer",
-    "invite_2_invitee_send_hashed_nonce",
-    "invite_2_invitee_send_nonce",
-    "invite_3_invitee_wait_peer_trust",
-    "invite_3_invitee_signify_trust",
+    "invite_2a_invitee_send_hashed_nonce",
+    "invite_2b_invitee_send_nonce",
+    "invite_3a_invitee_signify_trust",
+    "invite_3b_invitee_wait_peer_trust",
     "invite_4_invitee_communicate",
 }
 

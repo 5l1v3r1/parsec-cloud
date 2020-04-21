@@ -15,6 +15,7 @@ from parsec.api.protocol import (
     ProtocolError,
     MessageSerializationError,
     InvalidMessageError,
+    InvitationStatus,
 )
 from parsec.backend.utils import CancelledByNewRequest, collect_apis
 from parsec.backend.config import BackendConfig
@@ -158,10 +159,10 @@ class BackendApp:
                     with self.event_bus.connection_context() as event_bus_ctx:
 
                         def _on_invite_status_changed(
-                            event, organization_id, inviter, token, is_deleted
+                            event, organization_id, inviter, token, status
                         ):
                             if (
-                                is_deleted
+                                status == InvitationStatus.DELETED
                                 and organization_id == client_ctx.organization_id
                                 and token == client_ctx.invitation.token
                             ):
