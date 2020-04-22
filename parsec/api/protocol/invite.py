@@ -28,8 +28,8 @@ __all__ = (
 
 
 class InvitationType(Enum):
-    USER = "user"
-    DEVICE = "device"
+    USER = "USER"
+    DEVICE = "DEVICE"
 
 
 InvitationTypeField = fields.enum_field_factory(InvitationType)
@@ -66,9 +66,9 @@ invite_new_serializer = CmdSerializer(InviteNewReqSchema, InviteNewRepSchema)
 
 
 class InvitationDeletedReason(Enum):
-    FINISHED = "finished"
-    CANCELLED = "cancelled"
-    ROTTEN = "rotten"
+    FINISHED = "FINISHED"
+    CANCELLED = "CANCELLED"
+    ROTTEN = "ROTTEN"
 
 
 InvitationDeletedReasonField = fields.enum_field_factory(InvitationDeletedReason)
@@ -91,9 +91,9 @@ class InviteListReqSchema(BaseReqSchema):
 
 
 class InvitationStatus(Enum):
-    IDLE = "idle"
-    READY = "ready"
-    DELETED = "deleted"
+    IDLE = "IDLE"
+    READY = "READY"
+    DELETED = "DELETED"
 
 
 InvitationStatusField = fields.enum_field_factory(InvitationStatus)

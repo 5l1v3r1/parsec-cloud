@@ -265,7 +265,7 @@ async def test_authenticated_handshake_bad_versions(
 
         # Alter answer
         answer_dict = unpackb(answer_req)
-        answer_dict["client_api_version"] = ApiVersion(2, 22)
+        answer_dict["client_api_version"] = ApiVersion(3, 22)
         answer_req = packb(answer_dict)
 
         await transport.send(answer_req)
@@ -275,4 +275,3 @@ async def test_authenticated_handshake_bad_versions(
             ch.process_result_req(result_req)
         assert "bad_protocol" in str(context.value)
         assert "{1.22}" in str(context.value)
-        assert "{2.22}" in str(context.value)

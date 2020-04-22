@@ -58,8 +58,8 @@ class HandshakeAPIVersionError(HandshakeError):
 
 
 class HandshakeType(Enum):
-    AUTHENTICATED = "authenticated"
-    INVITED = "invited"
+    AUTHENTICATED = "AUTHENTICATED"
+    INVITED = "INVITED"
 
 
 HandshakeTypeField = fields.enum_field_factory(HandshakeType)
@@ -125,8 +125,8 @@ class HandshakeAuthenticatedAnswerSchema(BaseSchema):
 
 
 class HandshakeInvitedOperation(Enum):
-    CLAIM_USER = "claim_user"
-    CLAIM_DEVICE = "claim_device"
+    CLAIM_USER = "CLAIM_USER"
+    CLAIM_DEVICE = "CLAIM_DEVICE"
 
 
 HandshakeInvitedOperationField = fields.enum_field_factory(HandshakeInvitedOperation)
@@ -398,6 +398,7 @@ class BaseClientHandshake:
 class AuthenticatedClientHandshake(BaseClientHandshake):
     SUPPORTED_API_VERSIONS = (API_V2_VERSION,)
     HANDSHAKE_TYPE = HandshakeType.AUTHENTICATED
+    HANDSHAKE_ANSWER_SERIALIZER = handshake_answer_serializer
 
     def __init__(
         self,
@@ -414,7 +415,7 @@ class AuthenticatedClientHandshake(BaseClientHandshake):
     def process_challenge_req(self, req: bytes) -> bytes:
         self.load_challenge_req(req)
         answer = self.user_signkey.sign(self.challenge_data["challenge"])
-        return handshake_answer_serializer.dumps(
+        return self.HANDSHAKE_ANSWER_SERIALIZER.dumps(
             {
                 "handshake": "answer",
                 "type": self.HANDSHAKE_TYPE,
@@ -430,6 +431,7 @@ class AuthenticatedClientHandshake(BaseClientHandshake):
 class APIV1_AuthenticatedClientHandshake(AuthenticatedClientHandshake):
     SUPPORTED_API_VERSIONS = (API_V1_VERSION,)
     HANDSHAKE_TYPE = APIV1_HandshakeType.AUTHENTICATED
+    HANDSHAKE_ANSWER_SERIALIZER = apiv1_handshake_answer_serializer
 
 
 class InvitedClientHandshake(BaseClientHandshake):
