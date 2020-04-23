@@ -14,12 +14,12 @@ from parsec.api.protocol import DeviceID
 from parsec.crypto import PrivateKey, SigningKey
 from parsec.core.backend_connection import (
     backend_authenticated_cmds_factory,
-    backend_anonymous_cmds_factory,
+    apiv1_backend_anonymous_cmds_factory,
 )
 
 
 @pytest.mark.trio
-async def test_device_invite_then_claim_ok(alice, alice_backend_cmds, running_backend):
+async def test_device_invite_then_claim_ok(alice, apiv1_alice_backend_cmds, running_backend):
     nd_id = DeviceID(f"{alice.user_id}@new_device")
     nd_signing_key = SigningKey.generate()
     token = "123456"
@@ -28,7 +28,7 @@ async def test_device_invite_then_claim_ok(alice, alice_backend_cmds, running_ba
     async def _alice_invite():
         nonlocal device_certificate
 
-        ret = await alice_backend_cmds.device_invite(nd_id.device_name)
+        ret = await apiv1_alice_backend_cmds.device_invite(nd_id.device_name)
         assert ret["status"] == "ok"
         claim = DeviceClaimContent.decrypt_and_load_for(
             ret["encrypted_claim"], recipient_privkey=alice.private_key
@@ -48,11 +48,11 @@ async def test_device_invite_then_claim_ok(alice, alice_backend_cmds, running_ba
             user_manifest_key=alice.user_manifest_key,
         ).dump_and_encrypt_for(recipient_pubkey=claim.answer_public_key)
         with trio.fail_after(1):
-            ret = await alice_backend_cmds.device_create(device_certificate, encrypted_answer)
+            ret = await apiv1_alice_backend_cmds.device_create(device_certificate, encrypted_answer)
             assert ret["status"] == "ok"
 
     async def _alice_nd_claim():
-        async with backend_anonymous_cmds_factory(alice.organization_addr) as cmds:
+        async with apiv1_backend_anonymous_cmds_factory(alice.organization_addr) as cmds:
             ret = await cmds.device_get_invitation_creator(nd_id)
             assert ret["status"] == "ok"
             assert ret["trustchain"] == {"devices": [], "revoked_users": [], "users": []}

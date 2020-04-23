@@ -187,7 +187,7 @@ def alice(local_device_factory, initial_user_manifest_state):
 
 
 @pytest.fixture
-def expiredalice(local_device_factory, initial_user_manifest_state, expiredorg):
+def expiredorgalice(local_device_factory, initial_user_manifest_state, expiredorg):
     device = local_device_factory("alice@dev1", expiredorg, is_admin=True)
     # Force alice user manifest v1 to be signed by user alice@dev1
     # This is needed given backend_factory bind alice@dev1 then alice@dev2,

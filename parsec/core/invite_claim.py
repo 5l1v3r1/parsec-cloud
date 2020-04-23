@@ -18,8 +18,8 @@ from parsec.api.protocol import UserID, DeviceName, DeviceID
 from parsec.core.types import LocalDevice, BackendOrganizationAddr
 
 from parsec.core.backend_connection import (
-    backend_authenticated_cmds_factory,
-    backend_anonymous_cmds_factory,
+    apiv1_backend_authenticated_cmds_factory,
+    apiv1_backend_anonymous_cmds_factory,
     BackendConnectionError,
     BackendNotAvailable,
 )
@@ -36,7 +36,7 @@ CANCEL_INVITATION_MAX_WAIT = 3
 
 
 # TODO: wrap exceptions from lower layers
-# TODO: handles backend_anonymous_cmds_factory for caller (just pass backend addr)
+# TODO: handles apiv1_backend_anonymous_cmds_factory for caller (just pass backend addr)
 
 
 class InviteClaimError(Exception):
@@ -89,7 +89,9 @@ async def claim_user(
     new_device = generate_new_device(new_device_id, organization_addr)
 
     try:
-        async with backend_anonymous_cmds_factory(organization_addr, keepalive=keepalive) as cmds:
+        async with apiv1_backend_anonymous_cmds_factory(
+            organization_addr, keepalive=keepalive
+        ) as cmds:
             # 1) Retrieve invitation creator
             try:
                 invitation_creator_user, invitation_creator_device = await get_user_invitation_creator(
@@ -167,7 +169,9 @@ async def claim_device(
     answer_private_key = PrivateKey.generate()
 
     try:
-        async with backend_anonymous_cmds_factory(organization_addr, keepalive=keepalive) as cmds:
+        async with apiv1_backend_anonymous_cmds_factory(
+            organization_addr, keepalive=keepalive
+        ) as cmds:
             # 1) Retrieve invitation creator
             try:
                 invitation_creator_user, invitation_creator_device = await get_device_invitation_creator(
@@ -248,7 +252,7 @@ async def invite_and_create_device(
         InviteClaimInvalidTokenError
     """
     try:
-        async with backend_authenticated_cmds_factory(
+        async with apiv1_backend_authenticated_cmds_factory(
             device.organization_addr, device.device_id, device.signing_key, keepalive=keepalive
         ) as cmds:
             try:
@@ -336,7 +340,7 @@ async def invite_and_create_user(
         InviteClaimInvalidTokenError
     """
     try:
-        async with backend_authenticated_cmds_factory(
+        async with apiv1_backend_authenticated_cmds_factory(
             device.organization_addr, device.device_id, device.signing_key, keepalive=keepalive
         ) as cmds:
             try:

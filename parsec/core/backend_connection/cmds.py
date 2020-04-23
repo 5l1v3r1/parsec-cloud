@@ -1,11 +1,11 @@
 # Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2019 Scille SAS
 
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Optional
 from uuid import UUID
 import pendulum
 from pendulum import Pendulum
 
-from parsec.crypto import VerifyKey
+from parsec.crypto import VerifyKey, PublicKey
 from parsec.api.transport import Transport, TransportError
 from parsec.api.protocol import (
     OrganizationID,
@@ -13,6 +13,24 @@ from parsec.api.protocol import (
     DeviceName,
     DeviceID,
     ProtocolError,
+    InvitationType,
+    InvitationDeletedReason,
+    invite_new_serializer,
+    invite_delete_serializer,
+    invite_list_serializer,
+    invite_info_serializer,
+    invite_1_invitee_wait_peer_serializer,
+    invite_1_inviter_wait_peer_serializer,
+    invite_2a_invitee_send_hashed_nonce_serializer,
+    invite_2a_inviter_get_hashed_nonce_serializer,
+    invite_2b_inviter_send_nonce_serializer,
+    invite_2b_invitee_send_nonce_serializer,
+    invite_3a_inviter_wait_peer_trust_serializer,
+    invite_3b_invitee_wait_peer_trust_serializer,
+    invite_3b_inviter_signify_trust_serializer,
+    invite_3a_invitee_signify_trust_serializer,
+    invite_4_inviter_communicate_serializer,
+    invite_4_invitee_communicate_serializer,
     ping_serializer,
     apiv1_organization_create_serializer,
     apiv1_organization_stats_serializer,
@@ -314,6 +332,145 @@ async def block_read(transport: Transport, block_id: UUID) -> dict:
     return await _send_cmd(transport, block_read_serializer, cmd="block_read", block_id=block_id)
 
 
+### Invite API ###
+
+
+async def invite_new(
+    transport: Transport, type: InvitationType, send_email: bool = False, invitee_email: str = None
+):
+    return await _send_cmd(
+        transport,
+        invite_new_serializer,
+        cmd="invite_new",
+        type=type,
+        send_email=send_email,
+        invitee_email=invitee_email,
+    )
+
+
+async def invite_list(transport: Transport):
+    return await _send_cmd(transport, invite_list_serializer, cmd="invite_list")
+
+
+async def invite_delete(transport: Transport, token: UUID, reason: InvitationDeletedReason):
+    return await _send_cmd(
+        transport, invite_delete_serializer, cmd="invite_delete", token=token, reason=reason
+    )
+
+
+async def invite_info(transport: Transport):
+    return await _send_cmd(transport, invite_info_serializer, cmd="invite_info")
+
+
+async def invite_1_invitee_wait_peer(transport: Transport, invitee_public_key: PublicKey):
+    return await _send_cmd(
+        transport,
+        invite_1_invitee_wait_peer_serializer,
+        cmd="invite_1_invitee_wait_peer",
+        invitee_public_key=invitee_public_key,
+    )
+
+
+async def invite_1_inviter_wait_peer(
+    transport: Transport, token: UUID, inviter_public_key: PublicKey
+):
+    return await _send_cmd(
+        transport,
+        invite_1_inviter_wait_peer_serializer,
+        cmd="invite_1_inviter_wait_peer",
+        token=token,
+        inviter_public_key=inviter_public_key,
+    )
+
+
+async def invite_2a_invitee_send_hashed_nonce(transport: Transport, invitee_hashed_nonce: bytes):
+    return await _send_cmd(
+        transport,
+        invite_2a_invitee_send_hashed_nonce_serializer,
+        cmd="invite_2a_invitee_send_hashed_nonce",
+        invitee_hashed_nonce=invitee_hashed_nonce,
+    )
+
+
+async def invite_2a_inviter_get_hashed_nonce(transport: Transport, token: UUID):
+    return await _send_cmd(
+        transport,
+        invite_2a_inviter_get_hashed_nonce_serializer,
+        cmd="invite_2a_inviter_get_hashed_nonce",
+        token=token,
+    )
+
+
+async def invite_2b_inviter_send_nonce(transport: Transport, token: UUID, inviter_nonce: bytes):
+    return await _send_cmd(
+        transport,
+        invite_2b_inviter_send_nonce_serializer,
+        cmd="invite_2b_inviter_send_nonce",
+        token=token,
+        inviter_nonce=inviter_nonce,
+    )
+
+
+async def invite_2b_invitee_send_nonce(transport: Transport, invitee_nonce: bytes):
+    return await _send_cmd(
+        transport,
+        invite_2b_invitee_send_nonce_serializer,
+        cmd="invite_2b_invitee_send_nonce",
+        invitee_nonce=invitee_nonce,
+    )
+
+
+async def invite_3a_inviter_wait_peer_trust(transport: Transport, token: UUID):
+    return await _send_cmd(
+        transport,
+        invite_3a_inviter_wait_peer_trust_serializer,
+        cmd="invite_3a_inviter_wait_peer_trust",
+        token=token,
+    )
+
+
+async def invite_3a_invitee_signify_trust(transport: Transport):
+    return await _send_cmd(
+        transport, invite_3a_invitee_signify_trust_serializer, cmd="invite_3a_invitee_signify_trust"
+    )
+
+
+async def invite_3b_invitee_wait_peer_trust(transport: Transport):
+    return await _send_cmd(
+        transport,
+        invite_3b_invitee_wait_peer_trust_serializer,
+        cmd="invite_3b_invitee_wait_peer_trust",
+    )
+
+
+async def invite_3b_inviter_signify_trust(transport: Transport, token: UUID):
+    return await _send_cmd(
+        transport,
+        invite_3b_inviter_signify_trust_serializer,
+        cmd="invite_3b_inviter_signify_trust",
+        token=token,
+    )
+
+
+async def invite_4_inviter_communicate(transport: Transport, token: UUID, payload: Optional[bytes]):
+    return await _send_cmd(
+        transport,
+        invite_4_inviter_communicate_serializer,
+        cmd="invite_4_inviter_communicate",
+        token=token,
+        payload=payload,
+    )
+
+
+async def invite_4_invitee_communicate(transport: Transport, payload: Optional[bytes]):
+    return await _send_cmd(
+        transport,
+        invite_4_invitee_communicate_serializer,
+        cmd="invite_4_invitee_communicate",
+        payload=payload,
+    )
+
+
 ### User API ###
 
 
@@ -321,7 +478,7 @@ async def user_get(transport: Transport, user_id: UserID) -> dict:
     return await _send_cmd(transport, user_get_serializer, cmd="user_get", user_id=user_id)
 
 
-async def user_find(
+async def apiv1_user_find(
     transport: Transport,
     query: str = None,
     page: int = 1,

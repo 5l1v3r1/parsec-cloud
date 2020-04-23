@@ -6,12 +6,12 @@ import pendulum
 
 from parsec.api.transport import Transport, Ping, Pong
 from parsec.api.data import RevokedUserCertificateContent
-from parsec.api.protocol import ServerHandshake, HandshakeType, AUTHENTICATED_CMDS
+from parsec.api.protocol import ServerHandshake, APIV1_HandshakeType, APIV1_AUTHENTICATED_CMDS
 from parsec.core.types import BackendOrganizationAddr
 from parsec.core.backend_connection import (
     BackendNotAvailable,
     BackendConnectionRefused,
-    backend_authenticated_cmds_factory,
+    apiv1_backend_authenticated_cmds_factory,
 )
 
 from tests.core.backend_connection.common import ALL_CMDS
@@ -20,7 +20,7 @@ from tests.core.backend_connection.common import ALL_CMDS
 @pytest.mark.trio
 async def test_backend_offline(alice):
     with pytest.raises(BackendNotAvailable):
-        async with backend_authenticated_cmds_factory(
+        async with apiv1_backend_authenticated_cmds_factory(
             alice.organization_addr, alice.device_id, alice.signing_key
         ) as cmds:
             await cmds.ping()
@@ -28,7 +28,7 @@ async def test_backend_offline(alice):
 
 @pytest.mark.trio
 async def test_backend_switch_offline(running_backend, alice):
-    async with backend_authenticated_cmds_factory(
+    async with apiv1_backend_authenticated_cmds_factory(
         alice.organization_addr, alice.device_id, alice.signing_key
     ) as cmds:
         await cmds.ping()
@@ -39,7 +39,7 @@ async def test_backend_switch_offline(running_backend, alice):
 
 @pytest.mark.trio
 async def test_backend_closed_cmds(running_backend, alice):
-    async with backend_authenticated_cmds_factory(
+    async with apiv1_backend_authenticated_cmds_factory(
         alice.organization_addr, alice.device_id, alice.signing_key
     ) as cmds:
         pass
@@ -49,7 +49,7 @@ async def test_backend_closed_cmds(running_backend, alice):
 
 @pytest.mark.trio
 async def test_ping(running_backend, alice):
-    async with backend_authenticated_cmds_factory(
+    async with apiv1_backend_authenticated_cmds_factory(
         alice.organization_addr, alice.device_id, alice.signing_key
     ) as cmds:
         rep = await cmds.ping("Hello World !")
@@ -59,7 +59,7 @@ async def test_ping(running_backend, alice):
 @pytest.mark.trio
 async def test_handshake_unknown_device(running_backend, alice, mallory):
     with pytest.raises(BackendConnectionRefused) as exc:
-        async with backend_authenticated_cmds_factory(
+        async with apiv1_backend_authenticated_cmds_factory(
             alice.organization_addr, mallory.device_id, mallory.signing_key
         ) as cmds:
             await cmds.ping()
@@ -74,7 +74,7 @@ async def test_handshake_unknown_organization(running_backend, alice):
         root_verify_key=alice.organization_addr.root_verify_key,
     )
     with pytest.raises(BackendConnectionRefused) as exc:
-        async with backend_authenticated_cmds_factory(
+        async with apiv1_backend_authenticated_cmds_factory(
             unknown_org_addr, alice.device_id, alice.signing_key
         ) as cmds:
             await cmds.ping()
@@ -89,7 +89,7 @@ async def test_handshake_rvk_mismatch(running_backend, alice, otherorg):
         root_verify_key=otherorg.root_verify_key,
     )
     with pytest.raises(BackendConnectionRefused) as exc:
-        async with backend_authenticated_cmds_factory(
+        async with apiv1_backend_authenticated_cmds_factory(
             bad_rvk_org_addr, alice.device_id, alice.signing_key
         ) as cmds:
             await cmds.ping()
@@ -109,7 +109,7 @@ async def test_handshake_revoked_device(running_backend, alice, bob):
     )
 
     with pytest.raises(BackendConnectionRefused) as exc:
-        async with backend_authenticated_cmds_factory(
+        async with apiv1_backend_authenticated_cmds_factory(
             bob.organization_addr, bob.device_id, bob.signing_key
         ) as cmds:
             await cmds.ping()
@@ -119,7 +119,7 @@ async def test_handshake_revoked_device(running_backend, alice, bob):
 @pytest.mark.trio
 async def test_organization_expired(running_backend, alice, expiredorg):
     with pytest.raises(BackendConnectionRefused) as exc:
-        async with backend_authenticated_cmds_factory(
+        async with apiv1_backend_authenticated_cmds_factory(
             expiredorg.addr, alice.device_id, alice.signing_key
         ) as cmds:
             await cmds.ping()
@@ -151,7 +151,7 @@ async def test_backend_disconnect_during_handshake(tcp_stream_spy, alice, backen
 
         with tcp_stream_spy.install_hook(backend_addr, connection_factory):
             with pytest.raises(BackendNotAvailable):
-                async with backend_authenticated_cmds_factory(
+                async with apiv1_backend_authenticated_cmds_factory(
                     alice.organization_addr, alice.device_id, alice.signing_key
                 ) as cmds:
                     await cmds.ping()
@@ -185,7 +185,7 @@ async def test_events_listen_wait_has_watchdog(monkeypatch, mock_clock, running_
     # event that will be returned to the client
     backend_received_cmd = trio.Event()
     backend_client_ctx = None
-    vanilla_api_events_listen = running_backend.backend.apis[HandshakeType.AUTHENTICATED][
+    vanilla_api_events_listen = running_backend.backend.apis[APIV1_HandshakeType.AUTHENTICATED][
         "events_listen"
     ]
 
@@ -195,12 +195,12 @@ async def test_events_listen_wait_has_watchdog(monkeypatch, mock_clock, running_
         backend_received_cmd.set()
         return await vanilla_api_events_listen(client_ctx, msg)
 
-    running_backend.backend.apis[HandshakeType.AUTHENTICATED][
+    running_backend.backend.apis[APIV1_HandshakeType.AUTHENTICATED][
         "events_listen"
     ] = _mocked_api_events_listen
 
     events_listen_rep = None
-    async with backend_authenticated_cmds_factory(
+    async with apiv1_backend_authenticated_cmds_factory(
         alice.organization_addr, alice.device_id, alice.signing_key, keepalive=2
     ) as cmds:
         mock_clock.rate = 1
@@ -244,10 +244,10 @@ async def test_events_listen_wait_has_watchdog(monkeypatch, mock_clock, running_
 
 @pytest.mark.trio
 async def test_authenticated_cmds_has_right_methods(running_backend, alice):
-    async with backend_authenticated_cmds_factory(
+    async with apiv1_backend_authenticated_cmds_factory(
         alice.organization_addr, alice.device_id, alice.signing_key
     ) as cmds:
-        for method_name in AUTHENTICATED_CMDS:
+        for method_name in APIV1_AUTHENTICATED_CMDS:
             assert hasattr(cmds, method_name)
-        for method_name in ALL_CMDS - AUTHENTICATED_CMDS:
+        for method_name in ALL_CMDS - APIV1_AUTHENTICATED_CMDS:
             assert not hasattr(cmds, method_name)

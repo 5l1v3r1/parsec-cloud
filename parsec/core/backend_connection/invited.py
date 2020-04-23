@@ -4,26 +4,26 @@ import trio
 from async_generator import asynccontextmanager
 from typing import Optional
 
-from parsec.core.types import BackendOrganizationAddr
-from parsec.core.backend_connection.transport import connect
+from parsec.core.types import BackendInvitationAddr
+from parsec.core.backend_connection.transport import connect_as_invited
 from parsec.core.backend_connection.exceptions import BackendNotAvailable
 from parsec.core.backend_connection.expose_cmds import expose_cmds
-from parsec.api.protocol import APIV1_ADMINISTRATION_CMDS
+from parsec.api.protocol import INVITED_CMDS
 
 
-class BackendAdministrationCmds:
+class BackendInvitedCmds:
     def __init__(self, addr, acquire_transport):
         self.addr = addr
         self.acquire_transport = acquire_transport
 
-    for cmd_name in APIV1_ADMINISTRATION_CMDS:
+    for cmd_name in INVITED_CMDS:
         vars()[cmd_name] = expose_cmds(cmd_name)
 
 
 @asynccontextmanager
-async def backend_administration_cmds_factory(
-    addr: BackendOrganizationAddr, token: str, keepalive: Optional[int] = None
-) -> BackendAdministrationCmds:
+async def backend_invited_cmds_factory(
+    addr: BackendInvitationAddr, keepalive: Optional[int] = None
+) -> BackendInvitedCmds:
     """
     Raises:
         BackendConnectionError
@@ -37,8 +37,8 @@ async def backend_administration_cmds_factory(
         if not transport:
             if closed:
                 raise trio.ClosedResourceError
-            transport = await connect(addr, administration_token=token, keepalive=keepalive)
-            transport.logger = transport.logger.bind(auth="<administration>")
+            transport = await connect_as_invited(addr, keepalive=keepalive)
+            transport.logger = transport.logger.bind(auth="<invited>")
 
     async def _destroy_transport():
         nonlocal transport
@@ -59,7 +59,7 @@ async def backend_administration_cmds_factory(
                 raise
 
     try:
-        yield BackendAdministrationCmds(addr, _acquire_transport)
+        yield BackendInvitedCmds(addr, _acquire_transport)
 
     finally:
         async with transport_lock:

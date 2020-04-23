@@ -469,7 +469,7 @@ def backend_factory(
     otherorg,
     alice,
     alice2,
-    expiredalice,
+    expiredorgalice,
     otheralice,
     adam,
     bob,
@@ -507,7 +507,7 @@ def backend_factory(
                     binder = backend_data_binder_factory(backend)
                     await binder.bind_organization(coolorg, alice)
                     await binder.bind_organization(
-                        expiredorg, expiredalice, expiration_date=pendulum.now()
+                        expiredorg, expiredorgalice, expiration_date=pendulum.now()
                     )
                     await binder.bind_organization(otherorg, otheralice)
                     await binder.bind_device(alice2)

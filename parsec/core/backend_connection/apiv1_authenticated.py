@@ -1,7 +1,6 @@
 # Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2019 Scille SAS
 
 import trio
-from enum import Enum
 from async_generator import asynccontextmanager
 from typing import Optional
 from structlog import get_logger
@@ -13,25 +12,23 @@ from parsec.api.data import EntryID
 from parsec.api.protocol import DeviceID
 from parsec.core.types import BackendOrganizationAddr
 from parsec.core.backend_connection import cmds
-from parsec.core.backend_connection.transport import connect_as_authenticated, TransportPool
+from parsec.core.backend_connection.transport import apiv1_connect, TransportPool
 from parsec.core.backend_connection.exceptions import BackendNotAvailable, BackendConnectionRefused
 from parsec.core.backend_connection.expose_cmds import expose_cmds_with_retrier
-from parsec.api.protocol import AUTHENTICATED_CMDS
+from parsec.core.backend_connection.authenticated import BackendConnStatus
+from parsec.api.protocol import APIV1_AUTHENTICATED_CMDS
 
 
 logger = get_logger()
 
 
-BackendConnStatus = Enum("BackendConnStatus", "READY LOST INITIALIZING REFUSED CRASHED")
-
-
-class BackendAuthenticatedCmds:
+class APIV1_BackendAuthenticatedCmds:
     def __init__(self, addr: BackendOrganizationAddr, acquire_transport):
         self.addr = addr
         self.acquire_transport = acquire_transport
 
-    for cmd_name in AUTHENTICATED_CMDS:
-        vars()[cmd_name] = expose_cmds_with_retrier(cmd_name)
+    for cmd_name in APIV1_AUTHENTICATED_CMDS:
+        vars()[cmd_name] = expose_cmds_with_retrier(cmd_name, apiv1=True)
 
 
 def _handle_event(event_bus: EventBus, rep: dict) -> None:
@@ -77,7 +74,7 @@ def _handle_event(event_bus: EventBus, rep: dict) -> None:
 
 def _transport_pool_factory(addr, device_id, signing_key, max_pool, keepalive):
     async def _connect():
-        transport = await connect_as_authenticated(
+        transport = await apiv1_connect(
             addr, device_id=device_id, signing_key=signing_key, keepalive=keepalive
         )
         transport.logger = transport.logger.bind(device_id=device_id)
@@ -86,7 +83,7 @@ def _transport_pool_factory(addr, device_id, signing_key, max_pool, keepalive):
     return TransportPool(_connect, max_pool=max_pool)
 
 
-class BackendAuthenticatedConn:
+class APIV1_BackendAuthenticatedConn:
     def __init__(
         self,
         addr: BackendOrganizationAddr,
@@ -106,7 +103,7 @@ class BackendAuthenticatedConn:
         )
         self._status = BackendConnStatus.LOST
         self._status_exc = None
-        self._cmds = BackendAuthenticatedCmds(addr, self._acquire_transport)
+        self._cmds = APIV1_BackendAuthenticatedCmds(addr, self._acquire_transport)
         self._manager_connect_cancel_scope = None
         self._monitors_cbs = []
         self._monitors_idle_event = trio.Event()
@@ -124,7 +121,7 @@ class BackendAuthenticatedConn:
         return self._status_exc
 
     @property
-    def cmds(self) -> BackendAuthenticatedCmds:
+    def cmds(self) -> APIV1_BackendAuthenticatedCmds:
         return self._cmds
 
     def register_monitor(self, monitor_cb) -> None:
@@ -267,7 +264,7 @@ class BackendAuthenticatedConn:
 
 
 @asynccontextmanager
-async def backend_authenticated_conn_factory(
+async def apiv1_backend_authenticated_conn_factory(
     addr: BackendOrganizationAddr,
     device_id: DeviceID,
     signing_key: SigningKey,
@@ -275,7 +272,7 @@ async def backend_authenticated_conn_factory(
     max_cooldown: int = 30,
     max_pool: int = 4,
     keepalive: Optional[int] = None,
-) -> BackendAuthenticatedConn:
+) -> APIV1_BackendAuthenticatedConn:
     """
     Raises: nothing !
     """
@@ -283,7 +280,7 @@ async def backend_authenticated_conn_factory(
         raise ValueError("max_pool must be at least 2 (for event listener + query sender)")
 
     async def _connect():
-        transport = await connect_as_authenticated(
+        transport = await apiv1_connect(
             addr, device_id=device_id, signing_key=signing_key, keepalive=keepalive
         )
         transport.logger = transport.logger.bind(device_id=device_id)
@@ -291,19 +288,19 @@ async def backend_authenticated_conn_factory(
 
     transport_pool = TransportPool(_connect, max_pool=max_pool)
     async with trio.open_service_nursery() as nursery:
-        yield BackendAuthenticatedConn(
+        yield APIV1_BackendAuthenticatedConn(
             nursery, transport_pool, addr=addr, event_bus=event_bus, max_cooldown=max_cooldown
         )
         nursery.cancel_scope.cancel()
 
 
 @asynccontextmanager
-async def backend_authenticated_cmds_factory(
+async def apiv1_backend_authenticated_cmds_factory(
     addr: BackendOrganizationAddr,
     device_id: DeviceID,
     signing_key: SigningKey,
     keepalive: Optional[int] = None,
-) -> BackendAuthenticatedCmds:
+) -> APIV1_BackendAuthenticatedCmds:
     """
     Raises:
         BackendConnectionError
@@ -317,7 +314,7 @@ async def backend_authenticated_cmds_factory(
         if not transport:
             if closed:
                 raise trio.ClosedResourceError
-            transport = await connect_as_authenticated(
+            transport = await apiv1_connect(
                 addr, device_id=device_id, signing_key=signing_key, keepalive=keepalive
             )
             transport.logger = transport.logger.bind(device_id=device_id)
@@ -341,7 +338,7 @@ async def backend_authenticated_cmds_factory(
                 raise
 
     try:
-        yield BackendAuthenticatedCmds(addr, _acquire_transport)
+        yield APIV1_BackendAuthenticatedCmds(addr, _acquire_transport)
 
     finally:
         async with transport_lock:

@@ -13,11 +13,19 @@ from parsec.api.protocol import (
     DeviceID,
     ProtocolError,
     HandshakeError,
+    BaseClientHandshake,
+    AuthenticatedClientHandshake,
+    InvitedClientHandshake,
     APIV1_AnonymousClientHandshake,
     APIV1_AuthenticatedClientHandshake,
     APIV1_AdministrationClientHandshake,
 )
-from parsec.core.types import BackendAddr, BackendOrganizationAddr, BackendOrganizationBootstrapAddr
+from parsec.core.types import (
+    BackendAddr,
+    BackendOrganizationAddr,
+    BackendOrganizationBootstrapAddr,
+    BackendInvitationAddr,
+)
 from parsec.core.backend_connection.exceptions import (
     BackendConnectionError,
     BackendNotAvailable,
@@ -29,7 +37,7 @@ from parsec.core.backend_connection.exceptions import (
 logger = get_logger()
 
 
-async def connect(
+async def apiv1_connect(
     addr: Union[BackendAddr, BackendOrganizationBootstrapAddr, BackendOrganizationAddr],
     device_id: Optional[DeviceID] = None,
     signing_key: Optional[SigningKey] = None,
@@ -68,18 +76,50 @@ async def connect(
             addr.organization_id, device_id, signing_key, addr.root_verify_key
         )
 
+    return await _connect(addr.hostname, addr.port, addr.use_ssl, keepalive, handshake)
+
+
+async def connect_as_invited(addr: BackendInvitationAddr, keepalive: Optional[int] = None):
+    handshake = InvitedClientHandshake(
+        organization_id=addr.organization_id, operation=addr.operation, token=addr.token
+    )
+    return await _connect(addr.hostname, addr.port, addr.use_ssl, keepalive, handshake)
+
+
+async def connect_as_authenticated(
+    addr: BackendOrganizationAddr,
+    device_id: DeviceID,
+    signing_key: SigningKey,
+    keepalive: Optional[int] = None,
+):
+    handshake = AuthenticatedClientHandshake(
+        organization_id=addr.organization_id,
+        device_id=device_id,
+        user_signkey=signing_key,
+        root_verify_key=addr.root_verify_key,
+    )
+    return await _connect(addr.hostname, addr.port, addr.use_ssl, keepalive, handshake)
+
+
+async def _connect(
+    hostname: str,
+    port: int,
+    use_ssl: bool,
+    keepalive: Optional[int],
+    handshake: BaseClientHandshake,
+) -> Transport:
     try:
-        stream = await trio.open_tcp_stream(addr.hostname, addr.port)
+        stream = await trio.open_tcp_stream(hostname, port)
 
     except OSError as exc:
         logger.debug("Impossible to connect to backend", reason=exc)
         raise BackendNotAvailable(exc) from exc
 
-    if addr.use_ssl:
-        stream = _upgrade_stream_to_ssl(stream, addr.hostname)
+    if use_ssl:
+        stream = _upgrade_stream_to_ssl(stream, hostname)
 
     try:
-        transport = await Transport.init_for_client(stream, host=addr.hostname)
+        transport = await Transport.init_for_client(stream, host=hostname)
         transport.handshake = handshake
         transport.keepalive = keepalive
 
