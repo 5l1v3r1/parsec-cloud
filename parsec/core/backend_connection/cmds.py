@@ -68,6 +68,7 @@ from parsec.api.protocol import (
     apiv1_device_get_invitation_creator_serializer,
     apiv1_device_claim_serializer,
     apiv1_device_cancel_invitation_serializer,
+    apiv1_device_create_serializer,
     device_create_serializer,
 )
 from parsec.core.types import EntryID
@@ -532,7 +533,7 @@ async def user_cancel_invitation(transport: Transport, user_id: UserID) -> dict:
 
 
 async def user_create(
-    transport: Transport, user_certificate: bytes, device_certificate: bytes
+    transport: Transport, user_certificate: bytes, device_certificate: bytes = None
 ) -> dict:
     return await _send_cmd(
         transport,
@@ -570,12 +571,21 @@ async def device_cancel_invitation(transport: Transport, invited_device_name: De
     )
 
 
-async def device_create(
+async def device_create(transport: Transport, device_certificate: bytes) -> dict:
+    return await _send_cmd(
+        transport,
+        device_create_serializer,
+        cmd="device_create",
+        device_certificate=device_certificate,
+    )
+
+
+async def apiv1_device_create(
     transport: Transport, device_certificate: bytes, encrypted_answer: bytes
 ) -> dict:
     return await _send_cmd(
         transport,
-        device_create_serializer,
+        apiv1_device_create_serializer,
         cmd="device_create",
         device_certificate=device_certificate,
         encrypted_answer=encrypted_answer,

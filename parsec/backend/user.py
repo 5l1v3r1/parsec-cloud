@@ -34,6 +34,7 @@ from parsec.api.protocol import (
     apiv1_device_invite_serializer,
     apiv1_device_claim_serializer,
     apiv1_device_cancel_invitation_serializer,
+    apiv1_device_create_serializer,
     device_create_serializer,
 )
 from parsec.backend.utils import catch_protocol_errors, run_with_breathing_transport, api
@@ -690,10 +691,10 @@ class BaseUserComponent:
 
         return apiv1_device_cancel_invitation_serializer.rep_dump({"status": "ok"})
 
-    @api("device_create")
+    @api("device_create", handshake_types=[APIV1_HandshakeType.AUTHENTICATED])
     @catch_protocol_errors
-    async def api_device_create(self, client_ctx, msg):
-        msg = device_create_serializer.req_load(msg)
+    async def apiv1_device_create(self, client_ctx, msg):
+        msg = apiv1_device_create_serializer.req_load(msg)
 
         try:
             data = DeviceCertificateContent.verify_and_load(
@@ -727,6 +728,46 @@ class BaseUserComponent:
             await self.create_device(
                 client_ctx.organization_id, device, encrypted_answer=msg["encrypted_answer"]
             )
+        except UserAlreadyExistsError as exc:
+            return {"status": "already_exists", "reason": str(exc)}
+
+        return apiv1_device_create_serializer.rep_dump({"status": "ok"})
+
+    @api("device_create", handshake_types=[HandshakeType.AUTHENTICATED])
+    @catch_protocol_errors
+    async def api_device_create(self, client_ctx, msg):
+        msg = device_create_serializer.req_load(msg)
+
+        try:
+            data = DeviceCertificateContent.verify_and_load(
+                msg["device_certificate"],
+                author_verify_key=client_ctx.verify_key,
+                expected_author=client_ctx.device_id,
+            )
+
+        except DataError as exc:
+            return {
+                "status": "invalid_certification",
+                "reason": f"Invalid certification data ({exc}).",
+            }
+
+        if not timestamps_in_the_ballpark(data.timestamp, pendulum.now()):
+            return {
+                "status": "invalid_certification",
+                "reason": f"Invalid timestamp in certification.",
+            }
+
+        if data.device_id.user_id != client_ctx.user_id:
+            return {"status": "bad_user_id", "reason": "Device must be handled by it own user."}
+
+        try:
+            device = Device(
+                device_id=data.device_id,
+                device_certificate=msg["device_certificate"],
+                device_certifier=data.author,
+                created_on=data.timestamp,
+            )
+            await self.create_device(client_ctx.organization_id, device)
         except UserAlreadyExistsError as exc:
             return {"status": "already_exists", "reason": str(exc)}
 

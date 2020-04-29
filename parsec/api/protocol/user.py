@@ -210,9 +210,22 @@ apiv1_device_cancel_invitation_serializer = CmdSerializer(
 )
 
 
-class DeviceCreateReqSchema(BaseReqSchema):
+class APIV1_DeviceCreateReqSchema(BaseReqSchema):
     device_certificate = fields.Bytes(required=True)
     encrypted_answer = fields.Bytes(required=True)
+
+
+class APIV1_DeviceCreateRepSchema(BaseRepSchema):
+    pass
+
+
+apiv1_device_create_serializer = CmdSerializer(
+    APIV1_DeviceCreateReqSchema, APIV1_DeviceCreateRepSchema
+)
+
+
+class DeviceCreateReqSchema(BaseReqSchema):
+    device_certificate = fields.Bytes(required=True)
 
 
 class DeviceCreateRepSchema(BaseRepSchema):

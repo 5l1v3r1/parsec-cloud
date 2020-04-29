@@ -62,6 +62,7 @@ from parsec.api.protocol.user import (
     apiv1_device_get_invitation_creator_serializer,
     apiv1_device_claim_serializer,
     apiv1_device_cancel_invitation_serializer,
+    apiv1_device_create_serializer,
     device_create_serializer,
     human_find_serializer,
 )
@@ -178,6 +179,7 @@ __all__ = (
     "apiv1_device_get_invitation_creator_serializer",
     "apiv1_device_claim_serializer",
     "apiv1_device_cancel_invitation_serializer",
+    "apiv1_device_create_serializer",
     "device_create_serializer",
     "human_find_serializer",
     # Invite
