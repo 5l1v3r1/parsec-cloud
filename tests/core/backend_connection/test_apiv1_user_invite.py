@@ -4,7 +4,7 @@ import pytest
 import trio
 import pendulum
 
-from parsec.api.data import UserCertificateContent, DeviceCertificateContent, UserClaimContent
+from parsec.api.data import UserCertificateContent, DeviceCertificateContent, APIV1_UserClaimContent
 from parsec.core.backend_connection import (
     backend_authenticated_cmds_factory,
     apiv1_backend_anonymous_cmds_factory,
@@ -20,7 +20,7 @@ async def test_user_invite_then_claim_ok(
     async def _alice_invite():
         rep = await apiv1_alice_backend_cmds.user_invite(mallory.user_id)
         assert rep["status"] == "ok"
-        claim = UserClaimContent.decrypt_and_load_for(
+        claim = APIV1_UserClaimContent.decrypt_and_load_for(
             rep["encrypted_claim"], recipient_privkey=alice.private_key
         )
 
@@ -52,7 +52,7 @@ async def test_user_invite_then_claim_ok(
             creator_device = DeviceCertificateContent.unsecure_load(rep["device_certificate"])
             assert creator_device.device_id.user_id == creator.user_id
 
-            encrypted_claim = UserClaimContent(
+            encrypted_claim = APIV1_UserClaimContent(
                 device_id=mallory.device_id,
                 token=token,
                 public_key=mallory.public_key,

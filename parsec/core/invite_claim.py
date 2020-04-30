@@ -10,9 +10,9 @@ from parsec.api.data import (
     DataError,
     UserCertificateContent,
     DeviceCertificateContent,
-    UserClaimContent,
-    DeviceClaimContent,
-    DeviceClaimAnswerContent,
+    APIV1_UserClaimContent,
+    APIV1_DeviceClaimContent,
+    APIV1_DeviceClaimAnswerContent,
 )
 from parsec.api.protocol import UserID, DeviceName, DeviceID
 from parsec.core.types import LocalDevice, BackendOrganizationAddr
@@ -106,7 +106,7 @@ async def claim_user(
 
             # 2) Generate claim info for invitation creator
             try:
-                encrypted_claim = UserClaimContent(
+                encrypted_claim = APIV1_UserClaimContent(
                     device_id=new_device_id,
                     token=token,
                     public_key=new_device.public_key,
@@ -186,7 +186,7 @@ async def claim_device(
 
             # 2) Generate claim info for invitation creator
             try:
-                encrypted_claim = DeviceClaimContent(
+                encrypted_claim = APIV1_DeviceClaimContent(
                     token=token,
                     device_id=new_device_id,
                     verify_key=device_signing_key.verify_key,
@@ -214,7 +214,7 @@ async def claim_device(
                 raise InviteClaimCryptoError(str(exc)) from exc
 
             try:
-                answer = DeviceClaimAnswerContent.decrypt_and_load_for(
+                answer = APIV1_DeviceClaimAnswerContent.decrypt_and_load_for(
                     rep["encrypted_answer"], recipient_privkey=answer_private_key
                 )
 
@@ -262,7 +262,7 @@ async def invite_and_create_device(
                     raise InviteClaimError(f"Cannot invite device: {rep}")
 
                 try:
-                    claim = DeviceClaimContent.decrypt_and_load_for(
+                    claim = APIV1_DeviceClaimContent.decrypt_and_load_for(
                         rep["encrypted_claim"], recipient_privkey=device.private_key
                     )
 
@@ -290,7 +290,7 @@ async def invite_and_create_device(
                     raise InviteClaimError(f"Cannot generate device certificate: {exc}") from exc
 
                 try:
-                    encrypted_answer = DeviceClaimAnswerContent(
+                    encrypted_answer = APIV1_DeviceClaimAnswerContent(
                         private_key=device.private_key,
                         user_manifest_id=device.user_manifest_id,
                         user_manifest_key=device.user_manifest_key,
@@ -351,7 +351,7 @@ async def invite_and_create_user(
                     raise InviteClaimError(f"Cannot invite user: {rep}")
 
                 try:
-                    claim = UserClaimContent.decrypt_and_load_for(
+                    claim = APIV1_UserClaimContent.decrypt_and_load_for(
                         rep["encrypted_claim"], recipient_privkey=device.private_key
                     )
 

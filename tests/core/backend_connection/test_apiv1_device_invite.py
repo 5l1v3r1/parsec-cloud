@@ -7,8 +7,8 @@ import pendulum
 from parsec.api.data import (
     UserCertificateContent,
     DeviceCertificateContent,
-    DeviceClaimContent,
-    DeviceClaimAnswerContent,
+    APIV1_DeviceClaimContent,
+    APIV1_DeviceClaimAnswerContent,
 )
 from parsec.api.protocol import DeviceID
 from parsec.crypto import PrivateKey, SigningKey
@@ -30,7 +30,7 @@ async def test_device_invite_then_claim_ok(alice, apiv1_alice_backend_cmds, runn
 
         ret = await apiv1_alice_backend_cmds.device_invite(nd_id.device_name)
         assert ret["status"] == "ok"
-        claim = DeviceClaimContent.decrypt_and_load_for(
+        claim = APIV1_DeviceClaimContent.decrypt_and_load_for(
             ret["encrypted_claim"], recipient_privkey=alice.private_key
         )
 
@@ -42,7 +42,7 @@ async def test_device_invite_then_claim_ok(alice, apiv1_alice_backend_cmds, runn
             device_id=claim.device_id,
             verify_key=claim.verify_key,
         ).dump_and_sign(alice.signing_key)
-        encrypted_answer = DeviceClaimAnswerContent(
+        encrypted_answer = APIV1_DeviceClaimAnswerContent(
             private_key=alice.private_key,
             user_manifest_id=alice.user_manifest_id,
             user_manifest_key=alice.user_manifest_key,
@@ -61,7 +61,7 @@ async def test_device_invite_then_claim_ok(alice, apiv1_alice_backend_cmds, runn
             assert creator_device.device_id.user_id == creator.user_id
 
             answer_private_key = PrivateKey.generate()
-            encrypted_claim = DeviceClaimContent(
+            encrypted_claim = APIV1_DeviceClaimContent(
                 token=token,
                 device_id=nd_id,
                 verify_key=nd_signing_key.verify_key,
@@ -72,10 +72,10 @@ async def test_device_invite_then_claim_ok(alice, apiv1_alice_backend_cmds, runn
                 assert ret["status"] == "ok"
 
             assert ret["device_certificate"] == device_certificate
-            answer = DeviceClaimAnswerContent.decrypt_and_load_for(
+            answer = APIV1_DeviceClaimAnswerContent.decrypt_and_load_for(
                 ret["encrypted_answer"], recipient_privkey=answer_private_key
             )
-            assert answer == DeviceClaimAnswerContent(
+            assert answer == APIV1_DeviceClaimAnswerContent(
                 private_key=alice.private_key,
                 user_manifest_id=alice.user_manifest_id,
                 user_manifest_key=alice.user_manifest_key,
