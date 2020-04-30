@@ -9,26 +9,26 @@ from parsec.api.protocol import HandshakeInvitedOperation
 from parsec.backend.invite import DeviceInvitation
 
 from tests.backend.common import (
-    invite_1_invitee_wait_peer,
-    invite_1_inviter_wait_peer,
-    invite_2a_invitee_send_hashed_nonce,
-    invite_2a_inviter_get_hashed_nonce,
-    invite_2b_inviter_send_nonce,
-    invite_2b_invitee_send_nonce,
-    invite_3a_inviter_wait_peer_trust,
-    invite_3a_invitee_signify_trust,
-    invite_3b_invitee_wait_peer_trust,
-    invite_3b_inviter_signify_trust,
-    invite_4_inviter_communicate,
-    invite_4_invitee_communicate,
+    invite_1_claimer_wait_peer,
+    invite_1_greeter_wait_peer,
+    invite_2a_claimer_send_hashed_nonce,
+    invite_2a_greeter_get_hashed_nonce,
+    invite_2b_greeter_send_nonce,
+    invite_2b_claimer_send_nonce,
+    invite_3a_greeter_wait_peer_trust,
+    invite_3a_claimer_signify_trust,
+    invite_3b_claimer_wait_peer_trust,
+    invite_3b_greeter_signify_trust,
+    invite_4_greeter_communicate,
+    invite_4_claimer_communicate,
 )
 
 
 @pytest.fixture
 async def invitation(backend, alice):
     invitation = DeviceInvitation(
-        inviter_user_id=alice.user_id,
-        inviter_human_handle=alice.human_handle,
+        greeter_user_id=alice.user_id,
+        greeter_human_handle=alice.human_handle,
         created_on=Pendulum(2000, 1, 2),
     )
     await backend.invite.new(organization_id=alice.organization_id, invitation=invitation)
@@ -79,47 +79,47 @@ class PeerControler:
 
 @pytest.fixture
 async def exchange_testbed(backend, alice, alice_backend_sock, invitation, invited_sock):
-    inviter_privkey = PrivateKey.generate()
-    invitee_privkey = PrivateKey.generate()
+    greeter_privkey = PrivateKey.generate()
+    claimer_privkey = PrivateKey.generate()
 
-    async def _run_inviter(peer_controller):
+    async def _run_greeter(peer_controller):
         while True:
             order, order_arg = await peer_controller.peer_next_order()
 
             if order == "1_wait_peer":
                 await peer_controller.peer_do(
-                    invite_1_inviter_wait_peer,
+                    invite_1_greeter_wait_peer,
                     alice_backend_sock,
                     token=invitation.token,
-                    inviter_public_key=inviter_privkey.public_key,
+                    greeter_public_key=greeter_privkey.public_key,
                 )
 
             elif order == "2a_get_hashed_nonce":
                 await peer_controller.peer_do(
-                    invite_2a_inviter_get_hashed_nonce, alice_backend_sock, token=invitation.token
+                    invite_2a_greeter_get_hashed_nonce, alice_backend_sock, token=invitation.token
                 )
 
             elif order == "2b_send_nonce":
                 await peer_controller.peer_do(
-                    invite_2b_inviter_send_nonce,
+                    invite_2b_greeter_send_nonce,
                     alice_backend_sock,
                     token=invitation.token,
-                    inviter_nonce=b"<inviter_nonce>",
+                    greeter_nonce=b"<greeter_nonce>",
                 )
 
             elif order == "3a_wait_peer_trust":
                 await peer_controller.peer_do(
-                    invite_3a_inviter_wait_peer_trust, alice_backend_sock, token=invitation.token
+                    invite_3a_greeter_wait_peer_trust, alice_backend_sock, token=invitation.token
                 )
 
             elif order == "3b_signify_trust":
                 await peer_controller.peer_do(
-                    invite_3b_inviter_signify_trust, alice_backend_sock, token=invitation.token
+                    invite_3b_greeter_signify_trust, alice_backend_sock, token=invitation.token
                 )
 
             elif order == "4_communicate":
                 await peer_controller.peer_do(
-                    invite_4_inviter_communicate,
+                    invite_4_greeter_communicate,
                     alice_backend_sock,
                     token=invitation.token,
                     payload=order_arg,
@@ -128,375 +128,375 @@ async def exchange_testbed(backend, alice, alice_backend_sock, invitation, invit
             else:
                 assert False
 
-    async def _run_invitee(peer_controller):
+    async def _run_claimer(peer_controller):
         while True:
             order, order_arg = await peer_controller.peer_next_order()
 
             if order == "1_wait_peer":
                 await peer_controller.peer_do(
-                    invite_1_invitee_wait_peer,
+                    invite_1_claimer_wait_peer,
                     invited_sock,
-                    invitee_public_key=invitee_privkey.public_key,
+                    claimer_public_key=claimer_privkey.public_key,
                 )
 
             elif order == "2a_send_hashed_nonce":
                 await peer_controller.peer_do(
-                    invite_2a_invitee_send_hashed_nonce,
+                    invite_2a_claimer_send_hashed_nonce,
                     invited_sock,
-                    invitee_hashed_nonce=b"<invitee_hashed_nonce>",
+                    claimer_hashed_nonce=b"<claimer_hashed_nonce>",
                 )
 
             elif order == "2b_send_nonce":
                 await peer_controller.peer_do(
-                    invite_2b_invitee_send_nonce, invited_sock, invitee_nonce=b"<invitee_nonce>"
+                    invite_2b_claimer_send_nonce, invited_sock, claimer_nonce=b"<claimer_nonce>"
                 )
 
             elif order == "3a_signify_trust":
-                await peer_controller.peer_do(invite_3a_invitee_signify_trust, invited_sock)
+                await peer_controller.peer_do(invite_3a_claimer_signify_trust, invited_sock)
 
             elif order == "3b_wait_peer_trust":
-                await peer_controller.peer_do(invite_3b_invitee_wait_peer_trust, invited_sock)
+                await peer_controller.peer_do(invite_3b_claimer_wait_peer_trust, invited_sock)
 
             elif order == "4_communicate":
                 await peer_controller.peer_do(
-                    invite_4_invitee_communicate, invited_sock, payload=order_arg
+                    invite_4_claimer_communicate, invited_sock, payload=order_arg
                 )
 
             else:
                 assert False
 
-    inviter_ctlr = PeerControler()
-    invitee_ctlr = PeerControler()
+    greeter_ctlr = PeerControler()
+    claimer_ctlr = PeerControler()
     async with trio.open_nursery() as nursery:
-        nursery.start_soon(_run_inviter, inviter_ctlr)
-        nursery.start_soon(_run_invitee, invitee_ctlr)
+        nursery.start_soon(_run_greeter, greeter_ctlr)
+        nursery.start_soon(_run_claimer, claimer_ctlr)
 
-        yield inviter_privkey, invitee_privkey, inviter_ctlr, invitee_ctlr
+        yield greeter_privkey, claimer_privkey, greeter_ctlr, claimer_ctlr
 
         nursery.cancel_scope.cancel()
 
 
 @pytest.mark.trio
-@pytest.mark.parametrize("leader", ("invitee", "inviter"))
+@pytest.mark.parametrize("leader", ("claimer", "greeter"))
 async def test_conduit_exchange_good(exchange_testbed, leader):
-    inviter_privkey, invitee_privkey, inviter_ctlr, invitee_ctlr = exchange_testbed
+    greeter_privkey, claimer_privkey, greeter_ctlr, claimer_ctlr = exchange_testbed
 
     # Step 1
-    if leader == "inviter":
-        await inviter_ctlr.send_order("1_wait_peer")
-        await invitee_ctlr.send_order("1_wait_peer")
+    if leader == "greeter":
+        await greeter_ctlr.send_order("1_wait_peer")
+        await claimer_ctlr.send_order("1_wait_peer")
     else:
-        await invitee_ctlr.send_order("1_wait_peer")
-        await inviter_ctlr.send_order("1_wait_peer")
-    inviter_rep = await inviter_ctlr.get_result()
-    invitee_rep = await invitee_ctlr.get_result()
-    assert inviter_rep == {"status": "ok", "invitee_public_key": invitee_privkey.public_key}
-    assert invitee_rep == {"status": "ok", "inviter_public_key": inviter_privkey.public_key}
+        await claimer_ctlr.send_order("1_wait_peer")
+        await greeter_ctlr.send_order("1_wait_peer")
+    greeter_rep = await greeter_ctlr.get_result()
+    claimer_rep = await claimer_ctlr.get_result()
+    assert greeter_rep == {"status": "ok", "claimer_public_key": claimer_privkey.public_key}
+    assert claimer_rep == {"status": "ok", "greeter_public_key": greeter_privkey.public_key}
 
     # Step 2
-    if leader == "inviter":
-        await inviter_ctlr.send_order("2a_get_hashed_nonce")
-        await invitee_ctlr.send_order("2a_send_hashed_nonce")
+    if leader == "greeter":
+        await greeter_ctlr.send_order("2a_get_hashed_nonce")
+        await claimer_ctlr.send_order("2a_send_hashed_nonce")
     else:
-        await invitee_ctlr.send_order("2a_send_hashed_nonce")
-        await inviter_ctlr.send_order("2a_get_hashed_nonce")
+        await claimer_ctlr.send_order("2a_send_hashed_nonce")
+        await greeter_ctlr.send_order("2a_get_hashed_nonce")
 
-    inviter_rep = await inviter_ctlr.get_result()
-    assert inviter_rep == {"status": "ok", "invitee_hashed_nonce": b"<invitee_hashed_nonce>"}
-    await inviter_ctlr.send_order("2b_send_nonce")
+    greeter_rep = await greeter_ctlr.get_result()
+    assert greeter_rep == {"status": "ok", "claimer_hashed_nonce": b"<claimer_hashed_nonce>"}
+    await greeter_ctlr.send_order("2b_send_nonce")
 
-    invitee_rep = await invitee_ctlr.get_result()
-    assert invitee_rep == {"status": "ok", "inviter_nonce": b"<inviter_nonce>"}
-    await invitee_ctlr.send_order("2b_send_nonce")
+    claimer_rep = await claimer_ctlr.get_result()
+    assert claimer_rep == {"status": "ok", "greeter_nonce": b"<greeter_nonce>"}
+    await claimer_ctlr.send_order("2b_send_nonce")
 
-    inviter_rep = await inviter_ctlr.get_result()
-    assert inviter_rep == {"status": "ok", "invitee_nonce": b"<invitee_nonce>"}
-    invitee_rep = await invitee_ctlr.get_result()
-    assert invitee_rep == {"status": "ok"}
+    greeter_rep = await greeter_ctlr.get_result()
+    assert greeter_rep == {"status": "ok", "claimer_nonce": b"<claimer_nonce>"}
+    claimer_rep = await claimer_ctlr.get_result()
+    assert claimer_rep == {"status": "ok"}
 
     # Step 3a
-    if leader == "inviter":
-        await inviter_ctlr.send_order("3a_wait_peer_trust")
-        await invitee_ctlr.send_order("3a_signify_trust")
+    if leader == "greeter":
+        await greeter_ctlr.send_order("3a_wait_peer_trust")
+        await claimer_ctlr.send_order("3a_signify_trust")
     else:
-        await invitee_ctlr.send_order("3a_signify_trust")
-        await inviter_ctlr.send_order("3a_wait_peer_trust")
-    inviter_rep = await inviter_ctlr.get_result()
-    assert inviter_rep == {"status": "ok"}
-    invitee_rep = await invitee_ctlr.get_result()
-    assert invitee_rep == {"status": "ok"}
+        await claimer_ctlr.send_order("3a_signify_trust")
+        await greeter_ctlr.send_order("3a_wait_peer_trust")
+    greeter_rep = await greeter_ctlr.get_result()
+    assert greeter_rep == {"status": "ok"}
+    claimer_rep = await claimer_ctlr.get_result()
+    assert claimer_rep == {"status": "ok"}
 
     # Step 3b
-    if leader == "inviter":
-        await inviter_ctlr.send_order("3b_signify_trust")
-        await invitee_ctlr.send_order("3b_wait_peer_trust")
+    if leader == "greeter":
+        await greeter_ctlr.send_order("3b_signify_trust")
+        await claimer_ctlr.send_order("3b_wait_peer_trust")
     else:
-        await invitee_ctlr.send_order("3b_wait_peer_trust")
-        await inviter_ctlr.send_order("3b_signify_trust")
-    inviter_rep = await inviter_ctlr.get_result()
-    assert inviter_rep == {"status": "ok"}
-    invitee_rep = await invitee_ctlr.get_result()
-    assert invitee_rep == {"status": "ok"}
+        await claimer_ctlr.send_order("3b_wait_peer_trust")
+        await greeter_ctlr.send_order("3b_signify_trust")
+    greeter_rep = await greeter_ctlr.get_result()
+    assert greeter_rep == {"status": "ok"}
+    claimer_rep = await claimer_ctlr.get_result()
+    assert claimer_rep == {"status": "ok"}
 
     # Step 4
-    if leader == "inviter":
-        await inviter_ctlr.send_order("4_communicate", b"hello from inviter")
-        await invitee_ctlr.send_order("4_communicate", b"hello from invitee")
+    if leader == "greeter":
+        await greeter_ctlr.send_order("4_communicate", b"hello from greeter")
+        await claimer_ctlr.send_order("4_communicate", b"hello from claimer")
     else:
-        await invitee_ctlr.send_order("4_communicate", b"hello from invitee")
-        await inviter_ctlr.send_order("4_communicate", b"hello from inviter")
-    inviter_rep = await inviter_ctlr.get_result()
-    assert inviter_rep == {"status": "ok", "payload": b"hello from invitee"}
-    invitee_rep = await invitee_ctlr.get_result()
-    assert invitee_rep == {"status": "ok", "payload": b"hello from inviter"}
+        await claimer_ctlr.send_order("4_communicate", b"hello from claimer")
+        await greeter_ctlr.send_order("4_communicate", b"hello from greeter")
+    greeter_rep = await greeter_ctlr.get_result()
+    assert greeter_rep == {"status": "ok", "payload": b"hello from claimer"}
+    claimer_rep = await claimer_ctlr.get_result()
+    assert claimer_rep == {"status": "ok", "payload": b"hello from greeter"}
 
-    if leader == "inviter":
-        await inviter_ctlr.send_order("4_communicate", None)
-        await invitee_ctlr.send_order("4_communicate", None)
+    if leader == "greeter":
+        await greeter_ctlr.send_order("4_communicate", None)
+        await claimer_ctlr.send_order("4_communicate", None)
     else:
-        await invitee_ctlr.send_order("4_communicate", None)
-        await inviter_ctlr.send_order("4_communicate", None)
-    inviter_rep = await inviter_ctlr.get_result()
-    assert inviter_rep == {"status": "ok", "payload": None}
-    invitee_rep = await invitee_ctlr.get_result()
-    assert invitee_rep == {"status": "ok", "payload": None}
+        await claimer_ctlr.send_order("4_communicate", None)
+        await greeter_ctlr.send_order("4_communicate", None)
+    greeter_rep = await greeter_ctlr.get_result()
+    assert greeter_rep == {"status": "ok", "payload": None}
+    claimer_rep = await claimer_ctlr.get_result()
+    assert claimer_rep == {"status": "ok", "payload": None}
 
 
 @pytest.mark.trio
 async def test_conduit_exchange_reset(exchange_testbed):
-    inviter_privkey, invitee_privkey, inviter_ctlr, invitee_ctlr = exchange_testbed
+    greeter_privkey, claimer_privkey, greeter_ctlr, claimer_ctlr = exchange_testbed
 
     # Step 1
-    await inviter_ctlr.send_order("1_wait_peer")
-    await invitee_ctlr.send_order("1_wait_peer")
-    await inviter_ctlr.assert_ok_rep()
-    await invitee_ctlr.assert_ok_rep()
+    await greeter_ctlr.send_order("1_wait_peer")
+    await claimer_ctlr.send_order("1_wait_peer")
+    await greeter_ctlr.assert_ok_rep()
+    await claimer_ctlr.assert_ok_rep()
 
-    # Invitee reset just before step 2a
-    for leader in ("invitee", "inviter"):
-        if leader == "invitee":
-            await invitee_ctlr.send_order("1_wait_peer")
-            await inviter_ctlr.send_order("2a_get_hashed_nonce")
+    # Claimer reset just before step 2a
+    for leader in ("claimer", "greeter"):
+        if leader == "claimer":
+            await claimer_ctlr.send_order("1_wait_peer")
+            await greeter_ctlr.send_order("2a_get_hashed_nonce")
         else:
-            await inviter_ctlr.send_order("2a_get_hashed_nonce")
-            await invitee_ctlr.send_order("1_wait_peer")
-        inviter_rep = await inviter_ctlr.get_result()
-        assert inviter_rep == {"status": "invalid_state"}
-        await inviter_ctlr.send_order("1_wait_peer")
-        await inviter_ctlr.assert_ok_rep()
-        await invitee_ctlr.assert_ok_rep()
+            await greeter_ctlr.send_order("2a_get_hashed_nonce")
+            await claimer_ctlr.send_order("1_wait_peer")
+        greeter_rep = await greeter_ctlr.get_result()
+        assert greeter_rep == {"status": "invalid_state"}
+        await greeter_ctlr.send_order("1_wait_peer")
+        await greeter_ctlr.assert_ok_rep()
+        await claimer_ctlr.assert_ok_rep()
 
-    # Inviter reset just before step 2a
-    for leader in ("invitee", "inviter"):
-        if leader == "invitee":
-            await invitee_ctlr.send_order("2a_send_hashed_nonce")
-            await inviter_ctlr.send_order("1_wait_peer")
+    # Greeter reset just before step 2a
+    for leader in ("claimer", "greeter"):
+        if leader == "claimer":
+            await claimer_ctlr.send_order("2a_send_hashed_nonce")
+            await greeter_ctlr.send_order("1_wait_peer")
         else:
-            await inviter_ctlr.send_order("1_wait_peer")
-            await invitee_ctlr.send_order("2a_send_hashed_nonce")
-        invitee_rep = await invitee_ctlr.get_result()
-        assert invitee_rep == {"status": "invalid_state"}
-        await invitee_ctlr.send_order("1_wait_peer")
-        await invitee_ctlr.assert_ok_rep()
-        await inviter_ctlr.assert_ok_rep()
+            await greeter_ctlr.send_order("1_wait_peer")
+            await claimer_ctlr.send_order("2a_send_hashed_nonce")
+        claimer_rep = await claimer_ctlr.get_result()
+        assert claimer_rep == {"status": "invalid_state"}
+        await claimer_ctlr.send_order("1_wait_peer")
+        await claimer_ctlr.assert_ok_rep()
+        await greeter_ctlr.assert_ok_rep()
 
     # Step 2a
-    await inviter_ctlr.send_order("2a_get_hashed_nonce")
-    await invitee_ctlr.send_order("2a_send_hashed_nonce")
-    inviter_rep = await inviter_ctlr.assert_ok_rep()
-    # Inviter reset after retreiving invitee hashed nonce
-    await inviter_ctlr.send_order("1_wait_peer")
-    invitee_rep = await invitee_ctlr.get_result()
-    assert invitee_rep == {"status": "invalid_state"}
-    await invitee_ctlr.send_order("1_wait_peer")
-    await invitee_ctlr.assert_ok_rep()
-    await inviter_ctlr.assert_ok_rep()
+    await greeter_ctlr.send_order("2a_get_hashed_nonce")
+    await claimer_ctlr.send_order("2a_send_hashed_nonce")
+    greeter_rep = await greeter_ctlr.assert_ok_rep()
+    # Greeter reset after retreiving claimer hashed nonce
+    await greeter_ctlr.send_order("1_wait_peer")
+    claimer_rep = await claimer_ctlr.get_result()
+    assert claimer_rep == {"status": "invalid_state"}
+    await claimer_ctlr.send_order("1_wait_peer")
+    await claimer_ctlr.assert_ok_rep()
+    await greeter_ctlr.assert_ok_rep()
 
     # Step 2a
-    await inviter_ctlr.send_order("2a_get_hashed_nonce")
-    await invitee_ctlr.send_order("2a_send_hashed_nonce")
-    await inviter_ctlr.assert_ok_rep()
+    await greeter_ctlr.send_order("2a_get_hashed_nonce")
+    await claimer_ctlr.send_order("2a_send_hashed_nonce")
+    await greeter_ctlr.assert_ok_rep()
     # Step 2b
-    await inviter_ctlr.send_order("2b_send_nonce")
-    await invitee_ctlr.assert_ok_rep()
-    # Invitee reset after retreiving inviter nonce
-    await invitee_ctlr.send_order("1_wait_peer")
-    inviter_rep = await inviter_ctlr.get_result()
-    assert inviter_rep == {"status": "invalid_state"}
-    await inviter_ctlr.send_order("1_wait_peer")
-    await inviter_ctlr.assert_ok_rep()
-    await invitee_ctlr.assert_ok_rep()
+    await greeter_ctlr.send_order("2b_send_nonce")
+    await claimer_ctlr.assert_ok_rep()
+    # Claimer reset after retreiving greeter nonce
+    await claimer_ctlr.send_order("1_wait_peer")
+    greeter_rep = await greeter_ctlr.get_result()
+    assert greeter_rep == {"status": "invalid_state"}
+    await greeter_ctlr.send_order("1_wait_peer")
+    await greeter_ctlr.assert_ok_rep()
+    await claimer_ctlr.assert_ok_rep()
 
     # Step 2a
-    await inviter_ctlr.send_order("2a_get_hashed_nonce")
-    await invitee_ctlr.send_order("2a_send_hashed_nonce")
-    await inviter_ctlr.assert_ok_rep()
+    await greeter_ctlr.send_order("2a_get_hashed_nonce")
+    await claimer_ctlr.send_order("2a_send_hashed_nonce")
+    await greeter_ctlr.assert_ok_rep()
     # Step 2b
-    await inviter_ctlr.send_order("2b_send_nonce")
-    await invitee_ctlr.assert_ok_rep()
-    await invitee_ctlr.send_order("2b_send_nonce")
-    await invitee_ctlr.assert_ok_rep()
-    await inviter_ctlr.assert_ok_rep()
-    # Inviter reset just before step 3a
-    for leader in ("invitee", "inviter"):
-        if leader == "invitee":
-            await invitee_ctlr.send_order("3a_signify_trust")
-            await inviter_ctlr.send_order("1_wait_peer")
+    await greeter_ctlr.send_order("2b_send_nonce")
+    await claimer_ctlr.assert_ok_rep()
+    await claimer_ctlr.send_order("2b_send_nonce")
+    await claimer_ctlr.assert_ok_rep()
+    await greeter_ctlr.assert_ok_rep()
+    # Greeter reset just before step 3a
+    for leader in ("claimer", "greeter"):
+        if leader == "claimer":
+            await claimer_ctlr.send_order("3a_signify_trust")
+            await greeter_ctlr.send_order("1_wait_peer")
         else:
-            await inviter_ctlr.send_order("1_wait_peer")
-            await invitee_ctlr.send_order("3a_signify_trust")
-        invitee_rep = await invitee_ctlr.get_result()
-        assert invitee_rep == {"status": "invalid_state"}
-        await invitee_ctlr.send_order("1_wait_peer")
-        await invitee_ctlr.assert_ok_rep()
-        await inviter_ctlr.assert_ok_rep()
+            await greeter_ctlr.send_order("1_wait_peer")
+            await claimer_ctlr.send_order("3a_signify_trust")
+        claimer_rep = await claimer_ctlr.get_result()
+        assert claimer_rep == {"status": "invalid_state"}
+        await claimer_ctlr.send_order("1_wait_peer")
+        await claimer_ctlr.assert_ok_rep()
+        await greeter_ctlr.assert_ok_rep()
 
     # Step 2a
-    await inviter_ctlr.send_order("2a_get_hashed_nonce")
-    await invitee_ctlr.send_order("2a_send_hashed_nonce")
-    await inviter_ctlr.assert_ok_rep()
+    await greeter_ctlr.send_order("2a_get_hashed_nonce")
+    await claimer_ctlr.send_order("2a_send_hashed_nonce")
+    await greeter_ctlr.assert_ok_rep()
     # Step 2b
-    await inviter_ctlr.send_order("2b_send_nonce")
-    await invitee_ctlr.assert_ok_rep()
-    await invitee_ctlr.send_order("2b_send_nonce")
-    await invitee_ctlr.assert_ok_rep()
-    await inviter_ctlr.assert_ok_rep()
-    # Invitee reset just before step 3a
-    for leader in ("invitee", "inviter"):
-        if leader == "invitee":
-            await invitee_ctlr.send_order("1_wait_peer")
-            await inviter_ctlr.send_order("3a_wait_peer_trust")
+    await greeter_ctlr.send_order("2b_send_nonce")
+    await claimer_ctlr.assert_ok_rep()
+    await claimer_ctlr.send_order("2b_send_nonce")
+    await claimer_ctlr.assert_ok_rep()
+    await greeter_ctlr.assert_ok_rep()
+    # Claimer reset just before step 3a
+    for leader in ("claimer", "greeter"):
+        if leader == "claimer":
+            await claimer_ctlr.send_order("1_wait_peer")
+            await greeter_ctlr.send_order("3a_wait_peer_trust")
         else:
-            await inviter_ctlr.send_order("3a_wait_peer_trust")
-            await invitee_ctlr.send_order("1_wait_peer")
-        inviter_rep = await inviter_ctlr.get_result()
-        assert inviter_rep == {"status": "invalid_state"}
-        await inviter_ctlr.send_order("1_wait_peer")
-        await inviter_ctlr.assert_ok_rep()
-        await invitee_ctlr.assert_ok_rep()
+            await greeter_ctlr.send_order("3a_wait_peer_trust")
+            await claimer_ctlr.send_order("1_wait_peer")
+        greeter_rep = await greeter_ctlr.get_result()
+        assert greeter_rep == {"status": "invalid_state"}
+        await greeter_ctlr.send_order("1_wait_peer")
+        await greeter_ctlr.assert_ok_rep()
+        await claimer_ctlr.assert_ok_rep()
 
     # Step 2a
-    await inviter_ctlr.send_order("2a_get_hashed_nonce")
-    await invitee_ctlr.send_order("2a_send_hashed_nonce")
-    await inviter_ctlr.assert_ok_rep()
+    await greeter_ctlr.send_order("2a_get_hashed_nonce")
+    await claimer_ctlr.send_order("2a_send_hashed_nonce")
+    await greeter_ctlr.assert_ok_rep()
     # Step 2b
-    await inviter_ctlr.send_order("2b_send_nonce")
-    await invitee_ctlr.assert_ok_rep()
-    await invitee_ctlr.send_order("2b_send_nonce")
-    await invitee_ctlr.assert_ok_rep()
-    await inviter_ctlr.assert_ok_rep()
+    await greeter_ctlr.send_order("2b_send_nonce")
+    await claimer_ctlr.assert_ok_rep()
+    await claimer_ctlr.send_order("2b_send_nonce")
+    await claimer_ctlr.assert_ok_rep()
+    await greeter_ctlr.assert_ok_rep()
     # Step 3a
-    await inviter_ctlr.send_order("3a_wait_peer_trust")
-    await invitee_ctlr.send_order("3a_signify_trust")
-    await invitee_ctlr.assert_ok_rep()
-    await inviter_ctlr.assert_ok_rep()
-    # Inviter reset just before step 3b
-    for leader in ("invitee", "inviter"):
-        if leader == "invitee":
-            await invitee_ctlr.send_order("3b_wait_peer_trust")
-            await inviter_ctlr.send_order("1_wait_peer")
+    await greeter_ctlr.send_order("3a_wait_peer_trust")
+    await claimer_ctlr.send_order("3a_signify_trust")
+    await claimer_ctlr.assert_ok_rep()
+    await greeter_ctlr.assert_ok_rep()
+    # Greeter reset just before step 3b
+    for leader in ("claimer", "greeter"):
+        if leader == "claimer":
+            await claimer_ctlr.send_order("3b_wait_peer_trust")
+            await greeter_ctlr.send_order("1_wait_peer")
         else:
-            await inviter_ctlr.send_order("1_wait_peer")
-            await invitee_ctlr.send_order("3b_wait_peer_trust")
-        invitee_rep = await invitee_ctlr.get_result()
-        assert invitee_rep == {"status": "invalid_state"}
-        await invitee_ctlr.send_order("1_wait_peer")
-        await invitee_ctlr.assert_ok_rep()
-        await inviter_ctlr.assert_ok_rep()
+            await greeter_ctlr.send_order("1_wait_peer")
+            await claimer_ctlr.send_order("3b_wait_peer_trust")
+        claimer_rep = await claimer_ctlr.get_result()
+        assert claimer_rep == {"status": "invalid_state"}
+        await claimer_ctlr.send_order("1_wait_peer")
+        await claimer_ctlr.assert_ok_rep()
+        await greeter_ctlr.assert_ok_rep()
 
     # Step 2a
-    await inviter_ctlr.send_order("2a_get_hashed_nonce")
-    await invitee_ctlr.send_order("2a_send_hashed_nonce")
-    await inviter_ctlr.assert_ok_rep()
+    await greeter_ctlr.send_order("2a_get_hashed_nonce")
+    await claimer_ctlr.send_order("2a_send_hashed_nonce")
+    await greeter_ctlr.assert_ok_rep()
     # Step 2b
-    await inviter_ctlr.send_order("2b_send_nonce")
-    await invitee_ctlr.assert_ok_rep()
-    await invitee_ctlr.send_order("2b_send_nonce")
-    await invitee_ctlr.assert_ok_rep()
-    await inviter_ctlr.assert_ok_rep()
+    await greeter_ctlr.send_order("2b_send_nonce")
+    await claimer_ctlr.assert_ok_rep()
+    await claimer_ctlr.send_order("2b_send_nonce")
+    await claimer_ctlr.assert_ok_rep()
+    await greeter_ctlr.assert_ok_rep()
     # Step 3a
-    await inviter_ctlr.send_order("3a_wait_peer_trust")
-    await invitee_ctlr.send_order("3a_signify_trust")
-    await invitee_ctlr.assert_ok_rep()
-    await inviter_ctlr.assert_ok_rep()
-    # Invitee reset just before step 3b
-    for leader in ("invitee", "inviter"):
-        if leader == "invitee":
-            await invitee_ctlr.send_order("1_wait_peer")
-            await inviter_ctlr.send_order("3b_signify_trust")
+    await greeter_ctlr.send_order("3a_wait_peer_trust")
+    await claimer_ctlr.send_order("3a_signify_trust")
+    await claimer_ctlr.assert_ok_rep()
+    await greeter_ctlr.assert_ok_rep()
+    # Claimer reset just before step 3b
+    for leader in ("claimer", "greeter"):
+        if leader == "claimer":
+            await claimer_ctlr.send_order("1_wait_peer")
+            await greeter_ctlr.send_order("3b_signify_trust")
         else:
-            await inviter_ctlr.send_order("3b_signify_trust")
-            await invitee_ctlr.send_order("1_wait_peer")
-        inviter_rep = await inviter_ctlr.get_result()
-        assert inviter_rep == {"status": "invalid_state"}
-        await inviter_ctlr.send_order("1_wait_peer")
-        await inviter_ctlr.assert_ok_rep()
-        await invitee_ctlr.assert_ok_rep()
+            await greeter_ctlr.send_order("3b_signify_trust")
+            await claimer_ctlr.send_order("1_wait_peer")
+        greeter_rep = await greeter_ctlr.get_result()
+        assert greeter_rep == {"status": "invalid_state"}
+        await greeter_ctlr.send_order("1_wait_peer")
+        await greeter_ctlr.assert_ok_rep()
+        await claimer_ctlr.assert_ok_rep()
 
     # Step 2a
-    await inviter_ctlr.send_order("2a_get_hashed_nonce")
-    await invitee_ctlr.send_order("2a_send_hashed_nonce")
-    await inviter_ctlr.assert_ok_rep()
+    await greeter_ctlr.send_order("2a_get_hashed_nonce")
+    await claimer_ctlr.send_order("2a_send_hashed_nonce")
+    await greeter_ctlr.assert_ok_rep()
     # Step 2b
-    await inviter_ctlr.send_order("2b_send_nonce")
-    await invitee_ctlr.assert_ok_rep()
-    await invitee_ctlr.send_order("2b_send_nonce")
-    await invitee_ctlr.assert_ok_rep()
-    await inviter_ctlr.assert_ok_rep()
+    await greeter_ctlr.send_order("2b_send_nonce")
+    await claimer_ctlr.assert_ok_rep()
+    await claimer_ctlr.send_order("2b_send_nonce")
+    await claimer_ctlr.assert_ok_rep()
+    await greeter_ctlr.assert_ok_rep()
     # Step 3a
-    await inviter_ctlr.send_order("3a_wait_peer_trust")
-    await invitee_ctlr.send_order("3a_signify_trust")
-    await invitee_ctlr.assert_ok_rep()
-    await inviter_ctlr.assert_ok_rep()
+    await greeter_ctlr.send_order("3a_wait_peer_trust")
+    await claimer_ctlr.send_order("3a_signify_trust")
+    await claimer_ctlr.assert_ok_rep()
+    await greeter_ctlr.assert_ok_rep()
     # Step 3b
-    await inviter_ctlr.send_order("3b_signify_trust")
-    await invitee_ctlr.send_order("3b_wait_peer_trust")
-    await invitee_ctlr.assert_ok_rep()
-    await inviter_ctlr.assert_ok_rep()
-    # Inviter reset just before step 4
-    for leader in ("invitee", "inviter"):
-        if leader == "invitee":
-            await invitee_ctlr.send_order("4_communicate")
-            await inviter_ctlr.send_order("1_wait_peer")
+    await greeter_ctlr.send_order("3b_signify_trust")
+    await claimer_ctlr.send_order("3b_wait_peer_trust")
+    await claimer_ctlr.assert_ok_rep()
+    await greeter_ctlr.assert_ok_rep()
+    # Greeter reset just before step 4
+    for leader in ("claimer", "greeter"):
+        if leader == "claimer":
+            await claimer_ctlr.send_order("4_communicate")
+            await greeter_ctlr.send_order("1_wait_peer")
         else:
-            await inviter_ctlr.send_order("1_wait_peer")
-            await invitee_ctlr.send_order("4_communicate")
-        invitee_rep = await invitee_ctlr.get_result()
-        assert invitee_rep == {"status": "invalid_state"}
-        await invitee_ctlr.send_order("1_wait_peer")
-        await invitee_ctlr.assert_ok_rep()
-        await inviter_ctlr.assert_ok_rep()
+            await greeter_ctlr.send_order("1_wait_peer")
+            await claimer_ctlr.send_order("4_communicate")
+        claimer_rep = await claimer_ctlr.get_result()
+        assert claimer_rep == {"status": "invalid_state"}
+        await claimer_ctlr.send_order("1_wait_peer")
+        await claimer_ctlr.assert_ok_rep()
+        await greeter_ctlr.assert_ok_rep()
 
     # Step 2a
-    await inviter_ctlr.send_order("2a_get_hashed_nonce")
-    await invitee_ctlr.send_order("2a_send_hashed_nonce")
-    await inviter_ctlr.assert_ok_rep()
+    await greeter_ctlr.send_order("2a_get_hashed_nonce")
+    await claimer_ctlr.send_order("2a_send_hashed_nonce")
+    await greeter_ctlr.assert_ok_rep()
     # Step 2b
-    await inviter_ctlr.send_order("2b_send_nonce")
-    await invitee_ctlr.assert_ok_rep()
-    await invitee_ctlr.send_order("2b_send_nonce")
-    await invitee_ctlr.assert_ok_rep()
-    await inviter_ctlr.assert_ok_rep()
+    await greeter_ctlr.send_order("2b_send_nonce")
+    await claimer_ctlr.assert_ok_rep()
+    await claimer_ctlr.send_order("2b_send_nonce")
+    await claimer_ctlr.assert_ok_rep()
+    await greeter_ctlr.assert_ok_rep()
     # Step 3a
-    await inviter_ctlr.send_order("3a_wait_peer_trust")
-    await invitee_ctlr.send_order("3a_signify_trust")
-    await invitee_ctlr.assert_ok_rep()
-    await inviter_ctlr.assert_ok_rep()
+    await greeter_ctlr.send_order("3a_wait_peer_trust")
+    await claimer_ctlr.send_order("3a_signify_trust")
+    await claimer_ctlr.assert_ok_rep()
+    await greeter_ctlr.assert_ok_rep()
     # Step 3b
-    await inviter_ctlr.send_order("3b_signify_trust")
-    await invitee_ctlr.send_order("3b_wait_peer_trust")
-    await invitee_ctlr.assert_ok_rep()
-    await inviter_ctlr.assert_ok_rep()
-    # Invitee reset just before step 4
-    for leader in ("invitee", "inviter"):
-        if leader == "invitee":
-            await invitee_ctlr.send_order("1_wait_peer")
-            await inviter_ctlr.send_order("4_communicate")
+    await greeter_ctlr.send_order("3b_signify_trust")
+    await claimer_ctlr.send_order("3b_wait_peer_trust")
+    await claimer_ctlr.assert_ok_rep()
+    await greeter_ctlr.assert_ok_rep()
+    # Claimer reset just before step 4
+    for leader in ("claimer", "greeter"):
+        if leader == "claimer":
+            await claimer_ctlr.send_order("1_wait_peer")
+            await greeter_ctlr.send_order("4_communicate")
         else:
-            await inviter_ctlr.send_order("4_communicate")
-            await invitee_ctlr.send_order("1_wait_peer")
-        inviter_rep = await inviter_ctlr.get_result()
-        assert inviter_rep == {"status": "invalid_state"}
-        await inviter_ctlr.send_order("1_wait_peer")
-        await inviter_ctlr.assert_ok_rep()
-        await invitee_ctlr.assert_ok_rep()
+            await greeter_ctlr.send_order("4_communicate")
+            await claimer_ctlr.send_order("1_wait_peer")
+        greeter_rep = await greeter_ctlr.get_result()
+        assert greeter_rep == {"status": "invalid_state"}
+        await greeter_ctlr.send_order("1_wait_peer")
+        await greeter_ctlr.assert_ok_rep()
+        await claimer_ctlr.assert_ok_rep()

@@ -82,7 +82,7 @@ async def test_invited_cmd_keepalive(
     mock_clock, monkeypatch, backend, running_backend, backend_addr, alice
 ):
     invitation = DeviceInvitation(
-        inviter_user_id=alice.user_id, inviter_human_handle=alice.human_handle
+        greeter_user_id=alice.user_id, greeter_human_handle=alice.human_handle
     )
     await backend.invite.new(organization_id=alice.organization_id, invitation=invitation)
     invitation_addr = BackendInvitationAddr.build(

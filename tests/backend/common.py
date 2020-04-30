@@ -25,23 +25,26 @@ from parsec.api.protocol import (
     events_subscribe_serializer,
     events_listen_serializer,
     user_get_serializer,
-    apiv1_user_find_serializer,
+    human_find_serializer,
+    user_create_serializer,
+    user_revoke_serializer,
+    device_create_serializer,
     invite_new_serializer,
     invite_list_serializer,
     invite_delete_serializer,
     invite_info_serializer,
-    invite_1_invitee_wait_peer_serializer,
-    invite_1_inviter_wait_peer_serializer,
-    invite_2a_invitee_send_hashed_nonce_serializer,
-    invite_2a_inviter_get_hashed_nonce_serializer,
-    invite_2b_inviter_send_nonce_serializer,
-    invite_2b_invitee_send_nonce_serializer,
-    invite_3a_inviter_wait_peer_trust_serializer,
-    invite_3a_invitee_signify_trust_serializer,
-    invite_3b_invitee_wait_peer_trust_serializer,
-    invite_3b_inviter_signify_trust_serializer,
-    invite_4_inviter_communicate_serializer,
-    invite_4_invitee_communicate_serializer,
+    invite_1_claimer_wait_peer_serializer,
+    invite_1_greeter_wait_peer_serializer,
+    invite_2a_claimer_send_hashed_nonce_serializer,
+    invite_2a_greeter_get_hashed_nonce_serializer,
+    invite_2b_greeter_send_nonce_serializer,
+    invite_2b_claimer_send_nonce_serializer,
+    invite_3a_greeter_wait_peer_trust_serializer,
+    invite_3a_claimer_signify_trust_serializer,
+    invite_3b_claimer_wait_peer_trust_serializer,
+    invite_3b_greeter_signify_trust_serializer,
+    invite_4_greeter_communicate_serializer,
+    invite_4_claimer_communicate_serializer,
 )
 
 
@@ -279,15 +282,40 @@ async def events_listen(sock):
 user_get = CmdSock(
     "user_get", user_get_serializer, parse_args=lambda self, user_id: {"user_id": user_id}
 )
-user_find = CmdSock(
-    "user_find",
-    apiv1_user_find_serializer,
-    parse_args=lambda self, query, omit_revoked, page, per_page: {
-        "query": query,
-        "omit_revoked": omit_revoked,
-        "page": page,
-        "per_page": per_page,
+human_find = CmdSock(
+    "human_find",
+    human_find_serializer,
+    parse_args=lambda self, query=None, omit_revoked=None, omit_non_human=None, page=None, per_page=None: {
+        k: v
+        for k, v in [
+            ("query", query),
+            ("omit_revoked", omit_revoked),
+            ("omit_non_human", omit_non_human),
+            ("page", page),
+            ("per_page", per_page),
+        ]
+        if v is not None
     },
+)
+user_create = CmdSock(
+    "user_create",
+    user_create_serializer,
+    parse_args=lambda self, user_certificate, device_certificate: {
+        "user_certificate": user_certificate,
+        "device_certificate": device_certificate,
+    },
+)
+user_revoke = CmdSock(
+    "user_revoke",
+    user_revoke_serializer,
+    parse_args=lambda self, revoked_user_certificate: {
+        "revoked_user_certificate": revoked_user_certificate
+    },
+)
+device_create = CmdSock(
+    "device_create",
+    device_create_serializer,
+    parse_args=lambda self, device_certificate: {"device_certificate": device_certificate},
 )
 
 
@@ -297,10 +325,10 @@ user_find = CmdSock(
 invite_new = CmdSock(
     "invite_new",
     invite_new_serializer,
-    parse_args=lambda self, type, send_email=False, invitee_email=None: {
+    parse_args=lambda self, type, send_email=False, claimer_email=None: {
         "type": type,
         "send_email": send_email,
-        "invitee_email": invitee_email,
+        "claimer_email": claimer_email,
     },
 )
 invite_list = CmdSock("invite_list", invite_list_serializer)
@@ -310,62 +338,62 @@ invite_delete = CmdSock(
     parse_args=lambda self, token, reason: {"token": token, "reason": reason},
 )
 invite_info = CmdSock("invite_info", invite_info_serializer)
-invite_1_invitee_wait_peer = CmdSock(
-    "invite_1_invitee_wait_peer",
-    invite_1_invitee_wait_peer_serializer,
-    parse_args=lambda self, invitee_public_key: {"invitee_public_key": invitee_public_key},
+invite_1_claimer_wait_peer = CmdSock(
+    "invite_1_claimer_wait_peer",
+    invite_1_claimer_wait_peer_serializer,
+    parse_args=lambda self, claimer_public_key: {"claimer_public_key": claimer_public_key},
 )
-invite_1_inviter_wait_peer = CmdSock(
-    "invite_1_inviter_wait_peer",
-    invite_1_inviter_wait_peer_serializer,
-    parse_args=lambda self, token, inviter_public_key: {
+invite_1_greeter_wait_peer = CmdSock(
+    "invite_1_greeter_wait_peer",
+    invite_1_greeter_wait_peer_serializer,
+    parse_args=lambda self, token, greeter_public_key: {
         "token": token,
-        "inviter_public_key": inviter_public_key,
+        "greeter_public_key": greeter_public_key,
     },
 )
-invite_2a_invitee_send_hashed_nonce = CmdSock(
-    "invite_2a_invitee_send_hashed_nonce",
-    invite_2a_invitee_send_hashed_nonce_serializer,
-    parse_args=lambda self, invitee_hashed_nonce: {"invitee_hashed_nonce": invitee_hashed_nonce},
+invite_2a_claimer_send_hashed_nonce = CmdSock(
+    "invite_2a_claimer_send_hashed_nonce",
+    invite_2a_claimer_send_hashed_nonce_serializer,
+    parse_args=lambda self, claimer_hashed_nonce: {"claimer_hashed_nonce": claimer_hashed_nonce},
 )
-invite_2a_inviter_get_hashed_nonce = CmdSock(
-    "invite_2a_inviter_get_hashed_nonce",
-    invite_2a_inviter_get_hashed_nonce_serializer,
+invite_2a_greeter_get_hashed_nonce = CmdSock(
+    "invite_2a_greeter_get_hashed_nonce",
+    invite_2a_greeter_get_hashed_nonce_serializer,
     parse_args=lambda self, token: {"token": token},
 )
-invite_2b_inviter_send_nonce = CmdSock(
-    "invite_2b_inviter_send_nonce",
-    invite_2b_inviter_send_nonce_serializer,
-    parse_args=lambda self, token, inviter_nonce: {"token": token, "inviter_nonce": inviter_nonce},
+invite_2b_greeter_send_nonce = CmdSock(
+    "invite_2b_greeter_send_nonce",
+    invite_2b_greeter_send_nonce_serializer,
+    parse_args=lambda self, token, greeter_nonce: {"token": token, "greeter_nonce": greeter_nonce},
 )
-invite_2b_invitee_send_nonce = CmdSock(
-    "invite_2b_invitee_send_nonce",
-    invite_2b_invitee_send_nonce_serializer,
-    parse_args=lambda self, invitee_nonce: {"invitee_nonce": invitee_nonce},
+invite_2b_claimer_send_nonce = CmdSock(
+    "invite_2b_claimer_send_nonce",
+    invite_2b_claimer_send_nonce_serializer,
+    parse_args=lambda self, claimer_nonce: {"claimer_nonce": claimer_nonce},
 )
-invite_3a_inviter_wait_peer_trust = CmdSock(
-    "invite_3a_inviter_wait_peer_trust",
-    invite_3a_inviter_wait_peer_trust_serializer,
+invite_3a_greeter_wait_peer_trust = CmdSock(
+    "invite_3a_greeter_wait_peer_trust",
+    invite_3a_greeter_wait_peer_trust_serializer,
     parse_args=lambda self, token: {"token": token},
 )
-invite_3a_invitee_signify_trust = CmdSock(
-    "invite_3a_invitee_signify_trust", invite_3a_invitee_signify_trust_serializer
+invite_3a_claimer_signify_trust = CmdSock(
+    "invite_3a_claimer_signify_trust", invite_3a_claimer_signify_trust_serializer
 )
-invite_3b_invitee_wait_peer_trust = CmdSock(
-    "invite_3b_invitee_wait_peer_trust", invite_3b_invitee_wait_peer_trust_serializer
+invite_3b_claimer_wait_peer_trust = CmdSock(
+    "invite_3b_claimer_wait_peer_trust", invite_3b_claimer_wait_peer_trust_serializer
 )
-invite_3b_inviter_signify_trust = CmdSock(
-    "invite_3b_inviter_signify_trust",
-    invite_3b_inviter_signify_trust_serializer,
+invite_3b_greeter_signify_trust = CmdSock(
+    "invite_3b_greeter_signify_trust",
+    invite_3b_greeter_signify_trust_serializer,
     parse_args=lambda self, token: {"token": token},
 )
-invite_4_inviter_communicate = CmdSock(
-    "invite_4_inviter_communicate",
-    invite_4_inviter_communicate_serializer,
+invite_4_greeter_communicate = CmdSock(
+    "invite_4_greeter_communicate",
+    invite_4_greeter_communicate_serializer,
     parse_args=lambda self, token, payload: {"token": token, "payload": payload},
 )
-invite_4_invitee_communicate = CmdSock(
-    "invite_4_invitee_communicate",
-    invite_4_invitee_communicate_serializer,
+invite_4_claimer_communicate = CmdSock(
+    "invite_4_claimer_communicate",
+    invite_4_claimer_communicate_serializer,
     parse_args=lambda self, payload: {"payload": payload},
 )

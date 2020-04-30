@@ -37,9 +37,9 @@ class BaseGreetInitialCtx:
     _cmds: BackendInvitedCmds
 
     async def _do_wait_peer(self) -> Tuple[int, int, SecretKey]:
-        inviter_private_key = PrivateKey.generate()
-        rep = await self._cmds.invite_1_inviter_wait_peer(
-            token=self.token, inviter_public_key=inviter_private_key.public_key
+        greeter_private_key = PrivateKey.generate()
+        rep = await self._cmds.invite_1_greeter_wait_peer(
+            token=self.token, greeter_public_key=greeter_private_key.public_key
         )
         if rep["status"] in ("not_found", "already_deleted"):
             raise InviteNotAvailableError()
@@ -47,11 +47,11 @@ class BaseGreetInitialCtx:
             raise InviteError(f"Backend error during step 1: {rep}")
 
         shared_secret_key = generate_shared_secret_key(
-            our_private_key=inviter_private_key, peer_public_key=rep["invitee_public_key"]
+            our_private_key=greeter_private_key, peer_public_key=rep["claimer_public_key"]
         )
-        inviter_nonce = generate_nonce()
+        greeter_nonce = generate_nonce()
 
-        rep = await self._cmds.invite_2a_inviter_get_hashed_nonce(token=self.token)
+        rep = await self._cmds.invite_2a_greeter_get_hashed_nonce(token=self.token)
         if rep["status"] in ("not_found", "already_deleted"):
             raise InviteNotAvailableError()
         elif rep["status"] == "invalid_state":
@@ -59,10 +59,10 @@ class BaseGreetInitialCtx:
         elif rep["status"] != "ok":
             raise InviteError(f"Backend error during step 2a: {rep}")
 
-        invitee_hashed_nonce = rep["invitee_hashed_nonce"]
+        claimer_hashed_nonce = rep["claimer_hashed_nonce"]
 
-        rep = await self._cmds.invite_2b_inviter_send_nonce(
-            token=self.token, inviter_nonce=inviter_nonce
+        rep = await self._cmds.invite_2b_greeter_send_nonce(
+            token=self.token, greeter_nonce=greeter_nonce
         )
         if rep["status"] in ("not_found", "already_deleted"):
             raise InviteNotAvailableError()
@@ -71,16 +71,16 @@ class BaseGreetInitialCtx:
         elif rep["status"] != "ok":
             raise InviteError(f"Backend error during step 2b: {rep}")
 
-        if HashDigest.from_data(rep["invitee_nonce"]) != invitee_hashed_nonce:
+        if HashDigest.from_data(rep["claimer_nonce"]) != claimer_hashed_nonce:
             raise InviteError("Invitee nonce and hashed nonce doesn't match")
 
-        invitee_sas, inviter_sas = generate_sas_codes(
-            invitee_nonce=rep["invitee_nonce"],
-            inviter_nonce=inviter_nonce,
+        claimer_sas, greeter_sas = generate_sas_codes(
+            claimer_nonce=rep["claimer_nonce"],
+            greeter_nonce=greeter_nonce,
             shared_secret_key=shared_secret_key,
         )
 
-        return invitee_sas, inviter_sas, shared_secret_key
+        return claimer_sas, greeter_sas, shared_secret_key
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -121,7 +121,7 @@ class BaseGreetInProgress1Ctx:
     _cmds: BackendInvitedCmds
 
     async def _do_wait_peer_trust(self) -> None:
-        rep = await self._cmds.invite_3a_inviter_wait_peer_trust(token=self.token)
+        rep = await self._cmds.invite_3a_greeter_wait_peer_trust(token=self.token)
         if rep["status"] in ("not_found", "already_deleted"):
             raise InviteNotAvailableError()
         elif rep["status"] == "invalid_state":
@@ -168,7 +168,7 @@ class BaseGreetInProgress2Ctx:
         return generate_sas_code_candidates(self.claimer_sas, size=size)
 
     async def _do_signify_trust(self) -> None:
-        rep = await self._cmds.invite_3b_inviter_signify_trust(token=self.token)
+        rep = await self._cmds.invite_3b_greeter_signify_trust(token=self.token)
         if rep["status"] in ("not_found", "already_deleted"):
             raise InviteNotAvailableError()
         elif rep["status"] == "invalid_state":
@@ -205,7 +205,7 @@ class UserGreetInProgress3Ctx:
     _cmds: BackendInvitedCmds
 
     async def do_get_claim_requests(self) -> "UserGreetInProgress4Ctx":
-        rep = await self._cmds.invite_4_inviter_communicate(token=self.token, payload=None)
+        rep = await self._cmds.invite_4_greeter_communicate(token=self.token, payload=None)
         if rep["status"] in ("not_found", "already_deleted"):
             raise InviteNotAvailableError()
         elif rep["status"] == "invalid_state":
@@ -240,7 +240,7 @@ class DeviceGreetInProgress3Ctx:
     _cmds: BackendInvitedCmds
 
     async def do_get_claim_requests(self) -> "DeviceGreetInProgress4Ctx":
-        rep = await self._cmds.invite_4_inviter_communicate(token=self.token, payload=None)
+        rep = await self._cmds.invite_4_greeter_communicate(token=self.token, payload=None)
         if rep["status"] in ("not_found", "already_deleted"):
             raise InviteNotAvailableError()
         elif rep["status"] == "invalid_state":
@@ -317,7 +317,7 @@ class UserGreetInProgress4Ctx:
         except DataError as exc:
             raise InviteError("Cannot generate InviteUserConfirmation payload") from exc
 
-        rep = await self._cmds.invite_4_inviter_communicate(token=self.token, payload=payload)
+        rep = await self._cmds.invite_4_greeter_communicate(token=self.token, payload=payload)
         if rep["status"] in ("not_found", "already_deleted"):
             raise InviteNotAvailableError()
         elif rep["status"] == "invalid_state":
@@ -365,7 +365,7 @@ class DeviceGreetInProgress4Ctx:
         except DataError as exc:
             raise InviteError("Cannot generate InviteUserConfirmation payload") from exc
 
-        rep = await self._cmds.invite_4_inviter_communicate(token=self.token, payload=payload)
+        rep = await self._cmds.invite_4_greeter_communicate(token=self.token, payload=payload)
         if rep["status"] in ("not_found", "already_deleted"):
             raise InviteNotAvailableError()
         elif rep["status"] == "invalid_state":

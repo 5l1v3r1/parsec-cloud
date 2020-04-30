@@ -22,7 +22,7 @@ from parsec.core.invite import (
 @pytest.mark.trio
 async def test_good_device_claim(running_backend, alice, alice_backend_cmds):
     invitation = DeviceInvitation(
-        inviter_user_id=alice.user_id, inviter_human_handle=alice.human_handle
+        greeter_user_id=alice.user_id, greeter_human_handle=alice.human_handle
     )
     await running_backend.backend.invite.new(
         organization_id=alice.organization_id, invitation=invitation
@@ -116,12 +116,12 @@ async def test_good_device_claim(running_backend, alice, alice_backend_cmds):
 
 @pytest.mark.trio
 async def test_good_user_claim(running_backend, alice, alice_backend_cmds):
-    invitee_email = "zack@example.com"
+    claimer_email = "zack@example.com"
 
     invitation = UserInvitation(
-        invitee_email=invitee_email,
-        inviter_user_id=alice.user_id,
-        inviter_human_handle=alice.human_handle,
+        claimer_email=claimer_email,
+        greeter_user_id=alice.user_id,
+        greeter_human_handle=alice.human_handle,
     )
     await running_backend.backend.invite.new(
         organization_id=alice.organization_id, invitation=invitation
@@ -147,7 +147,7 @@ async def test_good_user_claim(running_backend, alice, alice_backend_cmds):
         async with backend_invited_cmds_factory(addr=invitation_addr) as cmds:
             initial_ctx = await claimer_retreive_info(cmds)
             assert isinstance(initial_ctx, UserClaimInitialCtx)
-            assert initial_ctx.claimer_email == invitee_email
+            assert initial_ctx.claimer_email == claimer_email
             assert initial_ctx.greeter_user_id == alice.user_id
             assert initial_ctx.greeter_human_handle == alice.human_handle
 

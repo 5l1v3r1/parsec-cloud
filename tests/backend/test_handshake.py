@@ -108,13 +108,13 @@ async def test_authenticated_handshake_bad_rvk(backend, server_factory, alice, o
 async def test_invited_handshake_good(backend, server_factory, alice, operation):
     if operation == HandshakeInvitedOperation.CLAIM_USER:
         invitation = UserInvitation(
-            inviter_user_id=alice.user_id,
-            inviter_human_handle=alice.human_handle,
-            invitee_email="zack@example.com",
+            greeter_user_id=alice.user_id,
+            greeter_human_handle=alice.human_handle,
+            claimer_email="zack@example.com",
         )
     else:  # Claim device
         invitation = DeviceInvitation(
-            inviter_user_id=alice.user_id, inviter_human_handle=alice.human_handle
+            greeter_user_id=alice.user_id, greeter_human_handle=alice.human_handle
         )
     await backend.invite.new(organization_id=alice.organization_id, invitation=invitation)
 
@@ -158,7 +158,7 @@ async def test_invited_handshake_bad_token(backend, server_factory, coolorg, ope
 @pytest.mark.trio
 async def test_invited_handshake_bad_token_type(backend, server_factory, alice):
     invitation = DeviceInvitation(
-        inviter_user_id=alice.user_id, inviter_human_handle=alice.human_handle
+        greeter_user_id=alice.user_id, greeter_human_handle=alice.human_handle
     )
     await backend.invite.new(organization_id=alice.organization_id, invitation=invitation)
 

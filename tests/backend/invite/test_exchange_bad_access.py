@@ -17,32 +17,32 @@ from parsec.backend.invite import DeviceInvitation
 
 from tests.backend.common import (
     invite_list,
-    invite_1_invitee_wait_peer,
-    invite_1_inviter_wait_peer,
-    invite_2a_invitee_send_hashed_nonce,
-    invite_2a_inviter_get_hashed_nonce,
-    invite_2b_inviter_send_nonce,
-    invite_2b_invitee_send_nonce,
-    invite_3a_inviter_wait_peer_trust,
-    invite_3a_invitee_signify_trust,
-    invite_3b_invitee_wait_peer_trust,
-    invite_3b_inviter_signify_trust,
-    invite_4_inviter_communicate,
-    invite_4_invitee_communicate,
+    invite_1_claimer_wait_peer,
+    invite_1_greeter_wait_peer,
+    invite_2a_claimer_send_hashed_nonce,
+    invite_2a_greeter_get_hashed_nonce,
+    invite_2b_greeter_send_nonce,
+    invite_2b_claimer_send_nonce,
+    invite_3a_greeter_wait_peer_trust,
+    invite_3a_claimer_signify_trust,
+    invite_3b_claimer_wait_peer_trust,
+    invite_3b_greeter_signify_trust,
+    invite_4_greeter_communicate,
+    invite_4_claimer_communicate,
 )
 
 
 @pytest.mark.trio
 @pytest.mark.parametrize("type", ("deleted_invitation", "unknown_token"))
-async def test_inviter_exchange_bad_access(alice, backend, alice_backend_sock, type):
+async def test_greeter_exchange_bad_access(alice, backend, alice_backend_sock, type):
     if type == "deleted_invitation":
         invitation = DeviceInvitation(
-            inviter_user_id=alice.user_id, inviter_human_handle=alice.human_handle
+            greeter_user_id=alice.user_id, greeter_human_handle=alice.human_handle
         )
         await backend.invite.new(organization_id=alice.organization_id, invitation=invitation)
         await backend.invite.delete(
             organization_id=alice.organization_id,
-            inviter=alice.user_id,
+            greeter=alice.user_id,
             token=invitation.token,
             on=Pendulum(2000, 1, 2),
             reason=InvitationDeletedReason.ROTTEN,
@@ -53,33 +53,33 @@ async def test_inviter_exchange_bad_access(alice, backend, alice_backend_sock, t
         token = uuid4()
         status = "not_found"
 
-    inviter_privkey = PrivateKey.generate()
+    greeter_privkey = PrivateKey.generate()
     with trio.fail_after(1):
-        rep = await invite_1_inviter_wait_peer(
-            alice_backend_sock, token=token, inviter_public_key=inviter_privkey.public_key
+        rep = await invite_1_greeter_wait_peer(
+            alice_backend_sock, token=token, greeter_public_key=greeter_privkey.public_key
         )
     assert rep == {"status": status}
 
     with trio.fail_after(1):
-        rep = await invite_2a_inviter_get_hashed_nonce(alice_backend_sock, token=token)
+        rep = await invite_2a_greeter_get_hashed_nonce(alice_backend_sock, token=token)
     assert rep == {"status": status}
 
     with trio.fail_after(1):
-        rep = await invite_2b_inviter_send_nonce(
-            alice_backend_sock, token=token, inviter_nonce=b"<inviter_nonce>"
+        rep = await invite_2b_greeter_send_nonce(
+            alice_backend_sock, token=token, greeter_nonce=b"<greeter_nonce>"
         )
     assert rep == {"status": status}
 
     with trio.fail_after(1):
-        rep = await invite_3a_inviter_wait_peer_trust(alice_backend_sock, token=token)
+        rep = await invite_3a_greeter_wait_peer_trust(alice_backend_sock, token=token)
     assert rep == {"status": status}
 
     with trio.fail_after(1):
-        rep = await invite_3b_inviter_signify_trust(alice_backend_sock, token=token)
+        rep = await invite_3b_greeter_signify_trust(alice_backend_sock, token=token)
     assert rep == {"status": status}
 
     with trio.fail_after(1):
-        rep = await invite_4_inviter_communicate(
+        rep = await invite_4_greeter_communicate(
             alice_backend_sock, token=token, payload=b"<payload>"
         )
     assert rep == {"status": status}
@@ -97,11 +97,11 @@ async def test_inviter_exchange_bad_access(alice, backend, alice_backend_sock, t
         "4_communicate",
     ),
 )
-async def test_invitee_exchange_bad_access(
+async def test_claimer_exchange_bad_access(
     alice, backend, backend_invited_sock_factory, action, monitor
 ):
     invitation = DeviceInvitation(
-        inviter_user_id=alice.user_id, inviter_human_handle=alice.human_handle
+        greeter_user_id=alice.user_id, greeter_human_handle=alice.human_handle
     )
     await backend.invite.new(organization_id=alice.organization_id, invitation=invitation)
 
@@ -114,30 +114,30 @@ async def test_invitee_exchange_bad_access(
     ) as invited_sock:
 
         if action == "1_wait_peer":
-            invitee_privkey = PrivateKey.generate()
-            async_call_ctx = invite_1_invitee_wait_peer.async_call(
-                invited_sock, invitee_public_key=invitee_privkey.public_key
+            claimer_privkey = PrivateKey.generate()
+            async_call_ctx = invite_1_claimer_wait_peer.async_call(
+                invited_sock, claimer_public_key=claimer_privkey.public_key
             )
         elif action == "2a_send_hashed_nonce":
-            async_call_ctx = invite_2a_invitee_send_hashed_nonce.async_call(
-                invited_sock, invitee_hashed_nonce=b"<invitee_hashed_nonce>"
+            async_call_ctx = invite_2a_claimer_send_hashed_nonce.async_call(
+                invited_sock, claimer_hashed_nonce=b"<claimer_hashed_nonce>"
             )
         elif action == "2b_send_nonce":
-            async_call_ctx = invite_2b_invitee_send_nonce.async_call(
-                invited_sock, invitee_nonce=b"<invitee_nonce>"
+            async_call_ctx = invite_2b_claimer_send_nonce.async_call(
+                invited_sock, claimer_nonce=b"<claimer_nonce>"
             )
         elif action == "3a_signify_trust":
-            async_call_ctx = invite_3a_invitee_signify_trust.async_call(invited_sock)
+            async_call_ctx = invite_3a_claimer_signify_trust.async_call(invited_sock)
         elif action == "3b_wait_peer_trust":
-            async_call_ctx = invite_3b_invitee_wait_peer_trust.async_call(invited_sock)
+            async_call_ctx = invite_3b_claimer_wait_peer_trust.async_call(invited_sock)
         elif action == "4_communicate":
-            async_call_ctx = invite_4_invitee_communicate.async_call(
+            async_call_ctx = invite_4_claimer_communicate.async_call(
                 invited_sock, payload=b"<payload>"
             )
 
         await backend.invite.delete(
             organization_id=alice.organization_id,
-            inviter=alice.user_id,
+            greeter=alice.user_id,
             token=invitation.token,
             on=Pendulum(2000, 1, 2),
             reason=InvitationDeletedReason.ROTTEN,
@@ -153,8 +153,8 @@ async def test_exchange_start_change_invitation_status(
     alice, backend, alice_backend_sock, backend_invited_sock_factory
 ):
     invitation = DeviceInvitation(
-        inviter_user_id=alice.user_id,
-        inviter_human_handle=alice.human_handle,
+        greeter_user_id=alice.user_id,
+        greeter_human_handle=alice.human_handle,
         created_on=Pendulum(2000, 1, 2),
     )
     await backend.invite.new(organization_id=alice.organization_id, invitation=invitation)
@@ -167,9 +167,9 @@ async def test_exchange_start_change_invitation_status(
             token=invitation.token,
         ) as invited_sock:
 
-            invitee_privkey = PrivateKey.generate()
-            async with invite_1_invitee_wait_peer.async_call(
-                invited_sock, invitee_public_key=invitee_privkey.public_key
+            claimer_privkey = PrivateKey.generate()
+            async with invite_1_claimer_wait_peer.async_call(
+                invited_sock, claimer_public_key=claimer_privkey.public_key
             ):
 
                 rep = await invite_list(alice_backend_sock)
@@ -187,5 +187,5 @@ async def test_exchange_start_change_invitation_status(
                     ],
                 }
 
-                # All good, just cancel the invitee request
+                # All good, just cancel the claimer request
                 cancel_scope.cancel()

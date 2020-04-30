@@ -70,8 +70,8 @@ class EventsComponent:
             except trio.WouldBlock:
                 client_ctx.logger.warning(f"event queue is full for {client_ctx}")
 
-        def _on_invite_status_changed(event, organization_id, inviter, token, is_deleted):
-            if organization_id != client_ctx.organization_id or inviter != client_ctx.user_id:
+        def _on_invite_status_changed(event, organization_id, greeter, token, is_deleted):
+            if organization_id != client_ctx.organization_id or greeter != client_ctx.user_id:
                 return
 
             try:

@@ -18,18 +18,18 @@ from parsec.api.protocol import (
     invite_delete_serializer,
     invite_list_serializer,
     invite_info_serializer,
-    invite_1_invitee_wait_peer_serializer,
-    invite_1_inviter_wait_peer_serializer,
-    invite_2a_invitee_send_hashed_nonce_serializer,
-    invite_2a_inviter_get_hashed_nonce_serializer,
-    invite_2b_inviter_send_nonce_serializer,
-    invite_2b_invitee_send_nonce_serializer,
-    invite_3a_inviter_wait_peer_trust_serializer,
-    invite_3a_invitee_signify_trust_serializer,
-    invite_3b_invitee_wait_peer_trust_serializer,
-    invite_3b_inviter_signify_trust_serializer,
-    invite_4_inviter_communicate_serializer,
-    invite_4_invitee_communicate_serializer,
+    invite_1_claimer_wait_peer_serializer,
+    invite_1_greeter_wait_peer_serializer,
+    invite_2a_claimer_send_hashed_nonce_serializer,
+    invite_2a_greeter_get_hashed_nonce_serializer,
+    invite_2b_greeter_send_nonce_serializer,
+    invite_2b_claimer_send_nonce_serializer,
+    invite_3a_greeter_wait_peer_trust_serializer,
+    invite_3a_claimer_signify_trust_serializer,
+    invite_3b_claimer_wait_peer_trust_serializer,
+    invite_3b_greeter_signify_trust_serializer,
+    invite_4_greeter_communicate_serializer,
+    invite_4_claimer_communicate_serializer,
 )
 from parsec.event_bus import EventBus
 from parsec.backend.utils import catch_protocol_errors, api
@@ -60,30 +60,30 @@ class InvitationInvalidStateError(InvitationError):
 
 class ConduitState(Enum):
     STATE_1_WAIT_PEERS = "state_1_wait_peers"
-    STATE_2_1_INVITEE_HASHED_NONCE = "state_2_1_invitee_hashed_nonce"
-    STATE_2_2_INVITER_NONCE = "state_2_2_inviter_nonce"
-    STATE_2_3_INVITEE_NONCE = "state_2_3_invitee_nonce"
-    STATE_3_1_INVITEE_TRUST = "state_3_1_invitee_trust"
-    STATE_3_2_INVITER_TRUST = "state_3_2_inviter_trust"
+    STATE_2_1_CLAIMER_HASHED_NONCE = "state_2_1_claimer_hashed_nonce"
+    STATE_2_2_GREETER_NONCE = "state_2_2_greeter_nonce"
+    STATE_2_3_CLAIMER_NONCE = "state_2_3_claimer_nonce"
+    STATE_3_1_CLAIMER_TRUST = "state_3_1_claimer_trust"
+    STATE_3_2_GREETER_TRUST = "state_3_2_greeter_trust"
     STATE_4_COMMUNICATE = "state_4_communicate"
 
 
 NEXT_CONDUIT_STATE = {
-    ConduitState.STATE_1_WAIT_PEERS: ConduitState.STATE_2_1_INVITEE_HASHED_NONCE,
-    ConduitState.STATE_2_1_INVITEE_HASHED_NONCE: ConduitState.STATE_2_2_INVITER_NONCE,
-    ConduitState.STATE_2_2_INVITER_NONCE: ConduitState.STATE_2_3_INVITEE_NONCE,
-    ConduitState.STATE_2_3_INVITEE_NONCE: ConduitState.STATE_3_1_INVITEE_TRUST,
-    ConduitState.STATE_3_1_INVITEE_TRUST: ConduitState.STATE_3_2_INVITER_TRUST,
-    ConduitState.STATE_3_2_INVITER_TRUST: ConduitState.STATE_4_COMMUNICATE,
+    ConduitState.STATE_1_WAIT_PEERS: ConduitState.STATE_2_1_CLAIMER_HASHED_NONCE,
+    ConduitState.STATE_2_1_CLAIMER_HASHED_NONCE: ConduitState.STATE_2_2_GREETER_NONCE,
+    ConduitState.STATE_2_2_GREETER_NONCE: ConduitState.STATE_2_3_CLAIMER_NONCE,
+    ConduitState.STATE_2_3_CLAIMER_NONCE: ConduitState.STATE_3_1_CLAIMER_TRUST,
+    ConduitState.STATE_3_1_CLAIMER_TRUST: ConduitState.STATE_3_2_GREETER_TRUST,
+    ConduitState.STATE_3_2_GREETER_TRUST: ConduitState.STATE_4_COMMUNICATE,
     ConduitState.STATE_4_COMMUNICATE: ConduitState.STATE_4_COMMUNICATE,
 }
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class UserInvitation:
-    inviter_user_id: UserID
-    inviter_human_handle: Optional[HumanHandle]
-    invitee_email: str
+    greeter_user_id: UserID
+    greeter_human_handle: Optional[HumanHandle]
+    claimer_email: str
     token: UUID = attr.ib(factory=uuid4)
     created_on: Pendulum = attr.ib(factory=pendulum_now)
     status: InvitationStatus = InvitationStatus.IDLE
@@ -96,8 +96,8 @@ class UserInvitation:
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class DeviceInvitation:
-    inviter_user_id: UserID
-    inviter_human_handle: Optional[HumanHandle]
+    greeter_user_id: UserID
+    greeter_human_handle: Optional[HumanHandle]
     token: UUID = attr.ib(factory=uuid4)
     created_on: Pendulum = attr.ib(factory=pendulum_now)
     status: InvitationStatus = InvitationStatus.IDLE
@@ -116,7 +116,7 @@ class BaseInviteComponent:
         self._event_bus = event_bus
         self._wip_invitations = {}
 
-        def _on_status_changed(event, organization_id, inviter, token, status):
+        def _on_status_changed(event, organization_id, greeter, token, status):
             key = (organization_id, token)
             if status == InvitationStatus.IDLE:
                 self._wip_invitations[key] = status
@@ -134,13 +134,13 @@ class BaseInviteComponent:
             if msg["send_email"]:
                 return invite_new_serializer.rep_dump({"status": "not_implemented"})
             invitation = UserInvitation(
-                inviter_user_id=client_ctx.user_id,
-                inviter_human_handle=client_ctx.human_handle,
-                invitee_email=msg["invitee_email"],
+                greeter_user_id=client_ctx.user_id,
+                greeter_human_handle=client_ctx.human_handle,
+                claimer_email=msg["claimer_email"],
             )
         else:  # Device
             invitation = DeviceInvitation(
-                inviter_user_id=client_ctx.user_id, inviter_human_handle=client_ctx.human_handle
+                greeter_user_id=client_ctx.user_id, greeter_human_handle=client_ctx.human_handle
             )
         try:
             await self.new(organization_id=client_ctx.organization_id, invitation=invitation)
@@ -157,7 +157,7 @@ class BaseInviteComponent:
         try:
             await self.delete(
                 organization_id=client_ctx.organization_id,
-                inviter=client_ctx.user_id,
+                greeter=client_ctx.user_id,
                 token=msg["token"],
                 on=pendulum_now(),
                 reason=msg["reason"],
@@ -176,7 +176,7 @@ class BaseInviteComponent:
     async def api_invite_list(self, client_ctx, msg):
         msg = invite_list_serializer.req_load(msg)
         invitations = await self.list(
-            organization_id=client_ctx.organization_id, inviter=client_ctx.user_id
+            organization_id=client_ctx.organization_id, greeter=client_ctx.user_id
         )
         return invite_list_serializer.rep_dump(
             {
@@ -187,8 +187,8 @@ class BaseInviteComponent:
                         else InvitationType.DEVICE,
                         "token": item.token,
                         "created_on": item.created_on,
-                        "invitee_email": getattr(
-                            item, "invitee_email", None
+                        "claimer_email": getattr(
+                            item, "claimer_email", None
                         ),  # Only available for user
                         "status": item.status,
                         "deleted_on": item.deleted_on,
@@ -209,29 +209,29 @@ class BaseInviteComponent:
         if isinstance(invitation, UserInvitation):
             rep = {
                 "type": InvitationType.USER,
-                "invitee_email": invitation.invitee_email,
-                "inviter_user_id": invitation.inviter_user_id,
-                "inviter_human_handle": invitation.inviter_human_handle,
+                "claimer_email": invitation.claimer_email,
+                "greeter_user_id": invitation.greeter_user_id,
+                "greeter_human_handle": invitation.greeter_human_handle,
             }
         else:  # DeviceInvitation
             rep = {
                 "type": InvitationType.DEVICE,
-                "inviter_user_id": invitation.inviter_user_id,
-                "inviter_human_handle": invitation.inviter_human_handle,
+                "greeter_user_id": invitation.greeter_user_id,
+                "greeter_human_handle": invitation.greeter_human_handle,
             }
         return invite_info_serializer.rep_dump(rep)
 
-    @api("invite_1_invitee_wait_peer", handshake_types=[HandshakeType.INVITED])
+    @api("invite_1_claimer_wait_peer", handshake_types=[HandshakeType.INVITED])
     @catch_protocol_errors
-    async def api_invite_1_invitee_wait_peer(self, client_ctx, msg):
-        msg = invite_1_invitee_wait_peer_serializer.req_load(msg)
+    async def api_invite_1_claimer_wait_peer(self, client_ctx, msg):
+        msg = invite_1_claimer_wait_peer_serializer.req_load(msg)
 
         try:
-            inviter_public_key = await self.conduit_invitee_talk(
+            greeter_public_key = await self.conduit_claimer_talk(
                 organization_id=client_ctx.organization_id,
                 token=client_ctx.invitation.token,
                 state=ConduitState.STATE_1_WAIT_PEERS,
-                payload=msg["invitee_public_key"],
+                payload=msg["claimer_public_key"],
             )
 
         except InvitationNotFoundError:
@@ -243,22 +243,22 @@ class BaseInviteComponent:
         except InvitationInvalidStateError:
             return {"status": "invalid_state"}
 
-        return invite_1_invitee_wait_peer_serializer.rep_dump(
-            {"status": "ok", "inviter_public_key": inviter_public_key}
+        return invite_1_claimer_wait_peer_serializer.rep_dump(
+            {"status": "ok", "greeter_public_key": greeter_public_key}
         )
 
-    @api("invite_1_inviter_wait_peer", handshake_types=[HandshakeType.AUTHENTICATED])
+    @api("invite_1_greeter_wait_peer", handshake_types=[HandshakeType.AUTHENTICATED])
     @catch_protocol_errors
-    async def api_invite_1_inviter_wait_peer(self, client_ctx, msg):
-        msg = invite_1_inviter_wait_peer_serializer.req_load(msg)
+    async def api_invite_1_greeter_wait_peer(self, client_ctx, msg):
+        msg = invite_1_greeter_wait_peer_serializer.req_load(msg)
 
         try:
-            invitee_public_key = await self.conduit_inviter_talk(
+            claimer_public_key = await self.conduit_greeter_talk(
                 organization_id=client_ctx.organization_id,
-                inviter=client_ctx.user_id,
+                greeter=client_ctx.user_id,
                 token=msg["token"],
                 state=ConduitState.STATE_1_WAIT_PEERS,
-                payload=msg["inviter_public_key"],
+                payload=msg["greeter_public_key"],
             )
 
         except InvitationNotFoundError:
@@ -270,27 +270,27 @@ class BaseInviteComponent:
         except InvitationInvalidStateError:
             return {"status": "invalid_state"}
 
-        return invite_1_inviter_wait_peer_serializer.rep_dump(
-            {"status": "ok", "invitee_public_key": invitee_public_key}
+        return invite_1_greeter_wait_peer_serializer.rep_dump(
+            {"status": "ok", "claimer_public_key": claimer_public_key}
         )
 
-    @api("invite_2a_invitee_send_hashed_nonce", handshake_types=[HandshakeType.INVITED])
+    @api("invite_2a_claimer_send_hashed_nonce", handshake_types=[HandshakeType.INVITED])
     @catch_protocol_errors
-    async def api_invite_2a_invitee_send_hashed_nonce(self, client_ctx, msg):
-        msg = invite_2a_invitee_send_hashed_nonce_serializer.req_load(msg)
+    async def api_invite_2a_claimer_send_hashed_nonce(self, client_ctx, msg):
+        msg = invite_2a_claimer_send_hashed_nonce_serializer.req_load(msg)
 
         try:
-            await self.conduit_invitee_talk(
+            await self.conduit_claimer_talk(
                 organization_id=client_ctx.organization_id,
                 token=client_ctx.invitation.token,
-                state=ConduitState.STATE_2_1_INVITEE_HASHED_NONCE,
-                payload=msg["invitee_hashed_nonce"],
+                state=ConduitState.STATE_2_1_CLAIMER_HASHED_NONCE,
+                payload=msg["claimer_hashed_nonce"],
             )
 
-            inviter_nonce = await self.conduit_invitee_talk(
+            greeter_nonce = await self.conduit_claimer_talk(
                 organization_id=client_ctx.organization_id,
                 token=client_ctx.invitation.token,
-                state=ConduitState.STATE_2_2_INVITER_NONCE,
+                state=ConduitState.STATE_2_2_GREETER_NONCE,
             )
 
         except InvitationNotFoundError:
@@ -302,21 +302,21 @@ class BaseInviteComponent:
         except InvitationInvalidStateError:
             return {"status": "invalid_state"}
 
-        return invite_2a_invitee_send_hashed_nonce_serializer.rep_dump(
-            {"status": "ok", "inviter_nonce": inviter_nonce}
+        return invite_2a_claimer_send_hashed_nonce_serializer.rep_dump(
+            {"status": "ok", "greeter_nonce": greeter_nonce}
         )
 
-    @api("invite_2a_inviter_get_hashed_nonce", handshake_types=[HandshakeType.AUTHENTICATED])
+    @api("invite_2a_greeter_get_hashed_nonce", handshake_types=[HandshakeType.AUTHENTICATED])
     @catch_protocol_errors
-    async def api_invite_2a_inviter_get_hashed_nonce(self, client_ctx, msg):
-        msg = invite_2a_inviter_get_hashed_nonce_serializer.req_load(msg)
+    async def api_invite_2a_greeter_get_hashed_nonce(self, client_ctx, msg):
+        msg = invite_2a_greeter_get_hashed_nonce_serializer.req_load(msg)
 
         try:
-            invitee_hashed_nonce = await self.conduit_inviter_talk(
+            claimer_hashed_nonce = await self.conduit_greeter_talk(
                 organization_id=client_ctx.organization_id,
-                inviter=client_ctx.user_id,
+                greeter=client_ctx.user_id,
                 token=msg["token"],
-                state=ConduitState.STATE_2_1_INVITEE_HASHED_NONCE,
+                state=ConduitState.STATE_2_1_CLAIMER_HASHED_NONCE,
             )
 
         except InvitationNotFoundError:
@@ -328,29 +328,29 @@ class BaseInviteComponent:
         except InvitationInvalidStateError:
             return {"status": "invalid_state"}
 
-        return invite_2a_inviter_get_hashed_nonce_serializer.rep_dump(
-            {"status": "ok", "invitee_hashed_nonce": invitee_hashed_nonce}
+        return invite_2a_greeter_get_hashed_nonce_serializer.rep_dump(
+            {"status": "ok", "claimer_hashed_nonce": claimer_hashed_nonce}
         )
 
-    @api("invite_2b_inviter_send_nonce", handshake_types=[HandshakeType.AUTHENTICATED])
+    @api("invite_2b_greeter_send_nonce", handshake_types=[HandshakeType.AUTHENTICATED])
     @catch_protocol_errors
-    async def api_invite_2b_inviter_send_nonce(self, client_ctx, msg):
-        msg = invite_2b_inviter_send_nonce_serializer.req_load(msg)
+    async def api_invite_2b_greeter_send_nonce(self, client_ctx, msg):
+        msg = invite_2b_greeter_send_nonce_serializer.req_load(msg)
 
         try:
-            await self.conduit_inviter_talk(
+            await self.conduit_greeter_talk(
                 organization_id=client_ctx.organization_id,
-                inviter=client_ctx.user_id,
+                greeter=client_ctx.user_id,
                 token=msg["token"],
-                state=ConduitState.STATE_2_2_INVITER_NONCE,
-                payload=msg["inviter_nonce"],
+                state=ConduitState.STATE_2_2_GREETER_NONCE,
+                payload=msg["greeter_nonce"],
             )
 
-            invitee_nonce = await self.conduit_inviter_talk(
+            claimer_nonce = await self.conduit_greeter_talk(
                 organization_id=client_ctx.organization_id,
-                inviter=client_ctx.user_id,
+                greeter=client_ctx.user_id,
                 token=msg["token"],
-                state=ConduitState.STATE_2_3_INVITEE_NONCE,
+                state=ConduitState.STATE_2_3_CLAIMER_NONCE,
             )
 
         except InvitationNotFoundError:
@@ -362,21 +362,21 @@ class BaseInviteComponent:
         except InvitationInvalidStateError:
             return {"status": "invalid_state"}
 
-        return invite_2b_inviter_send_nonce_serializer.rep_dump(
-            {"status": "ok", "invitee_nonce": invitee_nonce}
+        return invite_2b_greeter_send_nonce_serializer.rep_dump(
+            {"status": "ok", "claimer_nonce": claimer_nonce}
         )
 
-    @api("invite_2b_invitee_send_nonce", handshake_types=[HandshakeType.INVITED])
+    @api("invite_2b_claimer_send_nonce", handshake_types=[HandshakeType.INVITED])
     @catch_protocol_errors
-    async def api_invite_2b_invitee_send_nonce(self, client_ctx, msg):
-        msg = invite_2b_invitee_send_nonce_serializer.req_load(msg)
+    async def api_invite_2b_claimer_send_nonce(self, client_ctx, msg):
+        msg = invite_2b_claimer_send_nonce_serializer.req_load(msg)
 
         try:
-            await self.conduit_invitee_talk(
+            await self.conduit_claimer_talk(
                 organization_id=client_ctx.organization_id,
                 token=client_ctx.invitation.token,
-                state=ConduitState.STATE_2_3_INVITEE_NONCE,
-                payload=msg["invitee_nonce"],
+                state=ConduitState.STATE_2_3_CLAIMER_NONCE,
+                payload=msg["claimer_nonce"],
             )
 
         except InvitationNotFoundError:
@@ -388,19 +388,19 @@ class BaseInviteComponent:
         except InvitationInvalidStateError:
             return {"status": "invalid_state"}
 
-        return invite_2b_invitee_send_nonce_serializer.rep_dump({"status": "ok"})
+        return invite_2b_claimer_send_nonce_serializer.rep_dump({"status": "ok"})
 
-    @api("invite_3a_inviter_wait_peer_trust", handshake_types=[HandshakeType.AUTHENTICATED])
+    @api("invite_3a_greeter_wait_peer_trust", handshake_types=[HandshakeType.AUTHENTICATED])
     @catch_protocol_errors
-    async def api_invite_3a_inviter_wait_peer_trust(self, client_ctx, msg):
-        msg = invite_3a_inviter_wait_peer_trust_serializer.req_load(msg)
+    async def api_invite_3a_greeter_wait_peer_trust(self, client_ctx, msg):
+        msg = invite_3a_greeter_wait_peer_trust_serializer.req_load(msg)
 
         try:
-            await self.conduit_inviter_talk(
+            await self.conduit_greeter_talk(
                 organization_id=client_ctx.organization_id,
-                inviter=client_ctx.user_id,
+                greeter=client_ctx.user_id,
                 token=msg["token"],
-                state=ConduitState.STATE_3_1_INVITEE_TRUST,
+                state=ConduitState.STATE_3_1_CLAIMER_TRUST,
             )
 
         except InvitationNotFoundError:
@@ -412,18 +412,18 @@ class BaseInviteComponent:
         except InvitationInvalidStateError:
             return {"status": "invalid_state"}
 
-        return invite_3a_inviter_wait_peer_trust_serializer.rep_dump({"status": "ok"})
+        return invite_3a_greeter_wait_peer_trust_serializer.rep_dump({"status": "ok"})
 
-    @api("invite_3b_invitee_wait_peer_trust", handshake_types=[HandshakeType.INVITED])
+    @api("invite_3b_claimer_wait_peer_trust", handshake_types=[HandshakeType.INVITED])
     @catch_protocol_errors
-    async def api_invite_3b_invitee_wait_peer_trust(self, client_ctx, msg):
-        msg = invite_3b_invitee_wait_peer_trust_serializer.req_load(msg)
+    async def api_invite_3b_claimer_wait_peer_trust(self, client_ctx, msg):
+        msg = invite_3b_claimer_wait_peer_trust_serializer.req_load(msg)
 
         try:
-            await self.conduit_invitee_talk(
+            await self.conduit_claimer_talk(
                 organization_id=client_ctx.organization_id,
                 token=client_ctx.invitation.token,
-                state=ConduitState.STATE_3_2_INVITER_TRUST,
+                state=ConduitState.STATE_3_2_GREETER_TRUST,
             )
 
         except InvitationNotFoundError:
@@ -435,19 +435,19 @@ class BaseInviteComponent:
         except InvitationInvalidStateError:
             return {"status": "invalid_state"}
 
-        return invite_3b_invitee_wait_peer_trust_serializer.rep_dump({"status": "ok"})
+        return invite_3b_claimer_wait_peer_trust_serializer.rep_dump({"status": "ok"})
 
-    @api("invite_3b_inviter_signify_trust", handshake_types=[HandshakeType.AUTHENTICATED])
+    @api("invite_3b_greeter_signify_trust", handshake_types=[HandshakeType.AUTHENTICATED])
     @catch_protocol_errors
-    async def api_invite_3b_inviter_signify_trust(self, client_ctx, msg):
-        msg = invite_3b_inviter_signify_trust_serializer.req_load(msg)
+    async def api_invite_3b_greeter_signify_trust(self, client_ctx, msg):
+        msg = invite_3b_greeter_signify_trust_serializer.req_load(msg)
 
         try:
-            await self.conduit_inviter_talk(
+            await self.conduit_greeter_talk(
                 organization_id=client_ctx.organization_id,
-                inviter=client_ctx.user_id,
+                greeter=client_ctx.user_id,
                 token=msg["token"],
-                state=ConduitState.STATE_3_2_INVITER_TRUST,
+                state=ConduitState.STATE_3_2_GREETER_TRUST,
             )
 
         except InvitationNotFoundError:
@@ -459,18 +459,18 @@ class BaseInviteComponent:
         except InvitationInvalidStateError:
             return {"status": "invalid_state"}
 
-        return invite_3b_inviter_signify_trust_serializer.rep_dump({"status": "ok"})
+        return invite_3b_greeter_signify_trust_serializer.rep_dump({"status": "ok"})
 
-    @api("invite_3a_invitee_signify_trust", handshake_types=[HandshakeType.INVITED])
+    @api("invite_3a_claimer_signify_trust", handshake_types=[HandshakeType.INVITED])
     @catch_protocol_errors
-    async def api_invite_3a_invitee_signify_trust(self, client_ctx, msg):
-        msg = invite_3a_invitee_signify_trust_serializer.req_load(msg)
+    async def api_invite_3a_claimer_signify_trust(self, client_ctx, msg):
+        msg = invite_3a_claimer_signify_trust_serializer.req_load(msg)
 
         try:
-            await self.conduit_invitee_talk(
+            await self.conduit_claimer_talk(
                 organization_id=client_ctx.organization_id,
                 token=client_ctx.invitation.token,
-                state=ConduitState.STATE_3_1_INVITEE_TRUST,
+                state=ConduitState.STATE_3_1_CLAIMER_TRUST,
             )
 
         except InvitationNotFoundError:
@@ -482,17 +482,17 @@ class BaseInviteComponent:
         except InvitationInvalidStateError:
             return {"status": "invalid_state"}
 
-        return invite_3a_invitee_signify_trust_serializer.rep_dump({"status": "ok"})
+        return invite_3a_claimer_signify_trust_serializer.rep_dump({"status": "ok"})
 
-    @api("invite_4_inviter_communicate", handshake_types=[HandshakeType.AUTHENTICATED])
+    @api("invite_4_greeter_communicate", handshake_types=[HandshakeType.AUTHENTICATED])
     @catch_protocol_errors
-    async def api_invite_4_inviter_communicate(self, client_ctx, msg):
-        msg = invite_4_inviter_communicate_serializer.req_load(msg)
+    async def api_invite_4_greeter_communicate(self, client_ctx, msg):
+        msg = invite_4_greeter_communicate_serializer.req_load(msg)
 
         try:
-            answer_payload = await self.conduit_inviter_talk(
+            answer_payload = await self.conduit_greeter_talk(
                 organization_id=client_ctx.organization_id,
-                inviter=client_ctx.user_id,
+                greeter=client_ctx.user_id,
                 token=msg["token"],
                 state=ConduitState.STATE_4_COMMUNICATE,
                 payload=msg["payload"],
@@ -507,17 +507,17 @@ class BaseInviteComponent:
         except InvitationInvalidStateError:
             return {"status": "invalid_state"}
 
-        return invite_4_inviter_communicate_serializer.rep_dump(
+        return invite_4_greeter_communicate_serializer.rep_dump(
             {"status": "ok", "payload": answer_payload}
         )
 
-    @api("invite_4_invitee_communicate", handshake_types=[HandshakeType.INVITED])
+    @api("invite_4_claimer_communicate", handshake_types=[HandshakeType.INVITED])
     @catch_protocol_errors
-    async def api_invite_4_invitee_communicate(self, client_ctx, msg):
-        msg = invite_4_invitee_communicate_serializer.req_load(msg)
+    async def api_invite_4_claimer_communicate(self, client_ctx, msg):
+        msg = invite_4_claimer_communicate_serializer.req_load(msg)
 
         try:
-            answer_payload = await self.conduit_invitee_talk(
+            answer_payload = await self.conduit_claimer_talk(
                 organization_id=client_ctx.organization_id,
                 token=client_ctx.invitation.token,
                 state=ConduitState.STATE_4_COMMUNICATE,
@@ -533,11 +533,11 @@ class BaseInviteComponent:
         except InvitationInvalidStateError:
             return {"status": "invalid_state"}
 
-        return invite_4_invitee_communicate_serializer.rep_dump(
+        return invite_4_claimer_communicate_serializer.rep_dump(
             {"status": "ok", "payload": answer_payload}
         )
 
-    async def conduit_invitee_talk(
+    async def conduit_claimer_talk(
         self,
         organization_id: OrganizationID,
         token: UUID,
@@ -546,10 +546,10 @@ class BaseInviteComponent:
     ) -> bytes:
         raise NotImplementedError()
 
-    async def conduit_inviter_talk(
+    async def conduit_greeter_talk(
         self,
         organization_id: OrganizationID,
-        inviter: UserID,
+        greeter: UserID,
         token: UUID,
         state: ConduitState,
         payload: Optional[bytes] = None,
@@ -566,7 +566,7 @@ class BaseInviteComponent:
     async def delete(
         self,
         organization_id: OrganizationID,
-        inviter: UserID,
+        greeter: UserID,
         token: UUID,
         on: Pendulum,
         reason: InvitationDeletedReason,
@@ -578,7 +578,7 @@ class BaseInviteComponent:
         """
         raise NotImplementedError()
 
-    async def list(self, organization_id: OrganizationID, inviter: UserID) -> List[Invitation]:
+    async def list(self, organization_id: OrganizationID, greeter: UserID) -> List[Invitation]:
         """
         Raises: Nothing
         """

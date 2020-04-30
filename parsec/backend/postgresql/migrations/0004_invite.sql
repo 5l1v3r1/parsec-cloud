@@ -17,17 +17,17 @@ CREATE TABLE invitation (
     token UUID NOT NULL,
     type invitation_type NOT NULL,
 
-    inviter INTEGER REFERENCES user_ (_id) NOT NULL,
-    inviter_human INTEGER REFERENCES human (_id),
-    invitee_email VARCHAR(255),  -- Required for when type=USER
+    greeter INTEGER REFERENCES user_ (_id) NOT NULL,
+    greeter_human INTEGER REFERENCES human (_id),
+    claimer_email VARCHAR(255),  -- Required for when type=USER
     created_on TIMESTAMPTZ NOT NULL,
 
     status invitation_status NOT NULL,
 	deleted_on TIMESTAMPTZ,
 	deleted_reason invitation_deleted_reason,
 
-    inviter_to_invitee_msg BYTEA,
-    invitee_to_inviter_msg BYTEA,
+    greeter_to_claimer_msg BYTEA,
+    claimer_to_greeter_msg BYTEA,
 
     UNIQUE(organization, token)
 );

@@ -40,7 +40,7 @@ async def check_allowed_cmds(backend_sock, cmds):
 @pytest.mark.trio
 async def test_invited_has_limited_access(backend, backend_invited_sock_factory, alice):
     invitation = DeviceInvitation(
-        inviter_user_id=alice.user_id, inviter_human_handle=alice.human_handle
+        greeter_user_id=alice.user_id, greeter_human_handle=alice.human_handle
     )
     await backend.invite.new(organization_id=alice.organization_id, invitation=invitation)
     async with backend_invited_sock_factory(

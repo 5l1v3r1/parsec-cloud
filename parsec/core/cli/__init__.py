@@ -3,7 +3,8 @@
 import click
 
 from parsec.core.cli import list_devices, status_organization
-from parsec.core.cli import invitation
+
+# from parsec.core.cli import invitation
 from parsec.core.cli import apiv1_invite_user
 from parsec.core.cli import apiv1_claim_user
 from parsec.core.cli import apiv1_invite_device
@@ -30,24 +31,30 @@ core_cmd.add_command(create_workspace.create_workspace, "create_workspace")
 core_cmd.add_command(share_workspace.share_workspace, "share_workspace")
 core_cmd.add_command(list_devices.list_devices, "list_devices")
 
-core_cmd.add_command(invitation.invite_user, "invite_user")
-core_cmd.add_command(invitation.claim_user, "claim_user")
-core_cmd.add_command(invitation.greet_user, "greet_user")
-core_cmd.add_command(invitation.invite_device, "invite_device")
+# core_cmd.add_command(invitation.invite_user, "invite_user")
+# core_cmd.add_command(invitation.claim_user, "claim_user")
+# core_cmd.add_command(invitation.greet_user, "greet_user")
+# core_cmd.add_command(invitation.invite_device, "invite_device")
 # core_cmd.add_command(invitation.claim_device, "claim_device")
 # core_cmd.add_command(invitation.greet_device, "greet_device")
 
 
-@click.group()
-def apiv1_cmd():
-    pass
+core_cmd.add_command(apiv1_invite_user.invite_user, "invite_user")
+core_cmd.add_command(apiv1_claim_user.claim_user, "claim_user")
+core_cmd.add_command(apiv1_invite_device.invite_device, "invite_device")
+core_cmd.add_command(apiv1_claim_device.claim_device, "claim_device")
 
 
-apiv1_cmd.add_command(apiv1_invite_user.invite_user, "invite_user")
-apiv1_cmd.add_command(apiv1_claim_user.claim_user, "claim_user")
-apiv1_cmd.add_command(apiv1_invite_device.invite_device, "invite_device")
-apiv1_cmd.add_command(apiv1_claim_device.claim_device, "claim_device")
-core_cmd.add_command(apiv1_cmd, "apiv1")
+# @click.group()
+# def apiv1_cmd():
+#     pass
+
+
+# apiv1_cmd.add_command(apiv1_invite_user.invite_user, "invite_user")
+# apiv1_cmd.add_command(apiv1_claim_user.claim_user, "claim_user")
+# apiv1_cmd.add_command(apiv1_invite_device.invite_device, "invite_device")
+# apiv1_cmd.add_command(apiv1_claim_device.claim_device, "claim_device")
+# core_cmd.add_command(apiv1_cmd, "apiv1")
 
 core_cmd.add_command(create_organization.create_organization, "create_organization")
 core_cmd.add_command(stats_organization.stats_organization, "stats_organization")

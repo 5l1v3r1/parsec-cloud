@@ -37,15 +37,15 @@ async def claimer_retreive_info(
 
     if rep["type"] == InvitationType.USER:
         return UserClaimInitialCtx(
-            claimer_email=rep["invitee_email"],
-            greeter_user_id=rep["inviter_user_id"],
-            greeter_human_handle=rep["inviter_human_handle"],
+            claimer_email=rep["claimer_email"],
+            greeter_user_id=rep["greeter_user_id"],
+            greeter_human_handle=rep["greeter_human_handle"],
             cmds=cmds,
         )
     else:
         return DeviceClaimInitialCtx(
-            greeter_user_id=rep["inviter_user_id"],
-            greeter_human_handle=rep["inviter_human_handle"],
+            greeter_user_id=rep["greeter_user_id"],
+            greeter_human_handle=rep["greeter_human_handle"],
             cmds=cmds,
         )
 
@@ -58,39 +58,39 @@ class BaseClaimInitialCtx:
     _cmds: BackendInvitedCmds
 
     async def _do_wait_peer(self) -> Tuple[int, int, SecretKey]:
-        invitee_private_key = PrivateKey.generate()
-        rep = await self._cmds.invite_1_invitee_wait_peer(
-            invitee_public_key=invitee_private_key.public_key
+        claimer_private_key = PrivateKey.generate()
+        rep = await self._cmds.invite_1_claimer_wait_peer(
+            claimer_public_key=claimer_private_key.public_key
         )
         if rep["status"] != "ok":
             raise InviteError(f"Backend error during step 1: {rep}")
 
         shared_secret_key = generate_shared_secret_key(
-            our_private_key=invitee_private_key, peer_public_key=rep["inviter_public_key"]
+            our_private_key=claimer_private_key, peer_public_key=rep["greeter_public_key"]
         )
-        invitee_nonce = generate_nonce()
+        claimer_nonce = generate_nonce()
 
-        rep = await self._cmds.invite_2a_invitee_send_hashed_nonce(
-            invitee_hashed_nonce=HashDigest.from_data(invitee_nonce)
+        rep = await self._cmds.invite_2a_claimer_send_hashed_nonce(
+            claimer_hashed_nonce=HashDigest.from_data(claimer_nonce)
         )
         if rep["status"] == "invalid_state":
             raise InvitePeerResetError()
         elif rep["status"] != "ok":
             raise InviteError(f"Backend error during step 2a: {rep}")
 
-        invitee_sas, inviter_sas = generate_sas_codes(
-            invitee_nonce=invitee_nonce,
-            inviter_nonce=rep["inviter_nonce"],
+        claimer_sas, greeter_sas = generate_sas_codes(
+            claimer_nonce=claimer_nonce,
+            greeter_nonce=rep["greeter_nonce"],
             shared_secret_key=shared_secret_key,
         )
 
-        rep = await self._cmds.invite_2b_invitee_send_nonce(invitee_nonce=invitee_nonce)
+        rep = await self._cmds.invite_2b_claimer_send_nonce(claimer_nonce=claimer_nonce)
         if rep["status"] == "invalid_state":
             raise InvitePeerResetError()
         elif rep["status"] != "ok":
             raise InviteError(f"Backend error during step 2b: {rep}")
 
-        return invitee_sas, inviter_sas, shared_secret_key
+        return claimer_sas, greeter_sas, shared_secret_key
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -131,7 +131,7 @@ class BaseClaimInProgress1Ctx:
         return generate_sas_code_candidates(self.greeter_sas, size=size)
 
     async def _do_signify_trust(self) -> None:
-        rep = await self._cmds.invite_3a_invitee_signify_trust()
+        rep = await self._cmds.invite_3a_claimer_signify_trust()
         if rep["status"] == "invalid_state":
             raise InvitePeerResetError()
         elif rep["status"] != "ok":
@@ -168,7 +168,7 @@ class BaseClaimInProgress2Ctx:
     _cmds: BackendInvitedCmds
 
     async def _do_wait_peer_trust(self) -> None:
-        rep = await self._cmds.invite_3b_invitee_wait_peer_trust()
+        rep = await self._cmds.invite_3b_claimer_wait_peer_trust()
         if rep["status"] == "invalid_state":
             raise InvitePeerResetError()
         elif rep["status"] != "ok":
@@ -210,13 +210,13 @@ class UserClaimInProgress3Ctx:
         except DataError as exc:
             raise InviteError("Cannot generate InviteUserData payload") from exc
 
-        rep = await self._cmds.invite_4_invitee_communicate(payload=payload)
+        rep = await self._cmds.invite_4_claimer_communicate(payload=payload)
         if rep["status"] == "invalid_state":
             raise InvitePeerResetError()
         elif rep["status"] != "ok":
             raise InviteError(f"Backend error during step 4 (data exchange): {rep}")
 
-        rep = await self._cmds.invite_4_invitee_communicate(payload=None)
+        rep = await self._cmds.invite_4_claimer_communicate(payload=None)
         if rep["status"] == "invalid_state":
             raise InvitePeerResetError()
         elif rep["status"] != "ok":
@@ -265,13 +265,13 @@ class DeviceClaimInProgress3Ctx:
         except DataError as exc:
             raise InviteError("Cannot generate InviteDeviceData payload") from exc
 
-        rep = await self._cmds.invite_4_invitee_communicate(payload=payload)
+        rep = await self._cmds.invite_4_claimer_communicate(payload=payload)
         if rep["status"] == "invalid_state":
             raise InvitePeerResetError()
         elif rep["status"] != "ok":
             raise InviteError(f"Backend error during step 4 (data exchange): {rep}")
 
-        rep = await self._cmds.invite_4_invitee_communicate(payload=None)
+        rep = await self._cmds.invite_4_claimer_communicate(payload=None)
         if rep["status"] == "invalid_state":
             raise InvitePeerResetError()
         elif rep["status"] != "ok":

@@ -19,7 +19,7 @@ from tests.core.backend_connection.common import ALL_CMDS
 @pytest.fixture
 async def invitation_addr(backend, alice):
     invitation = DeviceInvitation(
-        inviter_user_id=alice.user_id, inviter_human_handle=alice.human_handle
+        greeter_user_id=alice.user_id, greeter_human_handle=alice.human_handle
     )
     await backend.invite.new(organization_id=alice.organization_id, invitation=invitation)
     return BackendInvitationAddr.build(
@@ -64,7 +64,7 @@ async def test_ping(running_backend, invitation_addr):
 @pytest.mark.trio
 async def test_handshake_organization_expired(running_backend, expiredorg, expiredorgalice):
     invitation = DeviceInvitation(
-        inviter_user_id=expiredorgalice.user_id, inviter_human_handle=expiredorgalice.human_handle
+        greeter_user_id=expiredorgalice.user_id, greeter_human_handle=expiredorgalice.human_handle
     )
     await running_backend.backend.invite.new(
         organization_id=expiredorgalice.organization_id, invitation=invitation

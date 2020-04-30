@@ -23,8 +23,8 @@ from parsec.backend.invite import (
 class Conduit:
     def __init__(self):
         self.state = ConduitState.STATE_1_WAIT_PEERS
-        self.invitee_send_channel, self.inviter_recv_channel = trio.open_memory_channel(0)
-        self.inviter_send_channel, self.invitee_recv_channel = trio.open_memory_channel(0)
+        self.claimer_send_channel, self.greeter_recv_channel = trio.open_memory_channel(0)
+        self.greeter_send_channel, self.claimer_recv_channel = trio.open_memory_channel(0)
 
 
 @attr.s
@@ -42,7 +42,7 @@ class MemoryInviteComponent(BaseInviteComponent):
     def register_components(self, **other_components):
         pass
 
-    async def conduit_invitee_talk(
+    async def conduit_claimer_talk(
         self,
         organization_id: OrganizationID,
         token: UUID,
@@ -50,19 +50,19 @@ class MemoryInviteComponent(BaseInviteComponent):
         payload: Optional[bytes] = None,
     ) -> bytes:
         return await self._conduit_talk(
-            organization_id, token, state, payload, is_inviter=False, inviter=None
+            organization_id, token, state, payload, is_greeter=False, greeter=None
         )
 
-    async def conduit_inviter_talk(
+    async def conduit_greeter_talk(
         self,
         organization_id: OrganizationID,
-        inviter: UserID,
+        greeter: UserID,
         token: UUID,
         state: ConduitState,
         payload: Optional[bytes] = None,
     ) -> bytes:
         return await self._conduit_talk(
-            organization_id, token, state, payload, is_inviter=True, inviter=inviter
+            organization_id, token, state, payload, is_greeter=True, greeter=greeter
         )
 
     async def _conduit_talk(
@@ -71,27 +71,27 @@ class MemoryInviteComponent(BaseInviteComponent):
         token: UUID,
         state: ConduitState,
         payload: Optional[bytes],
-        is_inviter: bool,
-        inviter: Optional[UserID],
+        is_greeter: bool,
+        greeter: Optional[UserID],
     ) -> bytes:
         org = self._organizations[organization_id]
         invitation = org.invitations.get(token)
-        if not invitation or (is_inviter and invitation.inviter_user_id != inviter):
+        if not invitation or (is_greeter and invitation.greeter_user_id != greeter):
             raise InvitationNotFoundError(token)
         if invitation.status == InvitationStatus.DELETED:
             raise InvitationAlreadyDeletedError(token)
-        if not is_inviter and state == ConduitState.STATE_1_WAIT_PEERS:
+        if not is_greeter and state == ConduitState.STATE_1_WAIT_PEERS:
             org.invitations[token] = invitation.evolve(status=InvitationStatus.READY)
         conduit = org.conduits.get(token)
         if not conduit:
             conduit = org.conduits[token] = Conduit()
 
-        if is_inviter:
-            send_channel = conduit.inviter_send_channel
-            recv_channel = conduit.inviter_recv_channel
+        if is_greeter:
+            send_channel = conduit.greeter_send_channel
+            recv_channel = conduit.greeter_recv_channel
         else:
-            send_channel = conduit.invitee_send_channel
-            recv_channel = conduit.invitee_recv_channel
+            send_channel = conduit.claimer_send_channel
+            recv_channel = conduit.claimer_recv_channel
 
         if conduit.state != state:
             if state == ConduitState.STATE_1_WAIT_PEERS:
@@ -137,14 +137,14 @@ class MemoryInviteComponent(BaseInviteComponent):
     async def delete(
         self,
         organization_id: OrganizationID,
-        inviter: UserID,
+        greeter: UserID,
         token: UUID,
         on: Pendulum,
         reason: InvitationDeletedReason,
     ) -> None:
         org = self._organizations[organization_id]
         invitation = org.invitations.get(token)
-        if not invitation or invitation.inviter_user_id != inviter:
+        if not invitation or invitation.greeter_user_id != greeter:
             raise InvitationNotFoundError(token)
         if invitation.status == InvitationStatus.DELETED:
             raise InvitationAlreadyDeletedError(token)
@@ -154,17 +154,17 @@ class MemoryInviteComponent(BaseInviteComponent):
         await self._send_event(
             "invite.status_changed",
             organization_id=organization_id,
-            inviter=inviter,
+            greeter=greeter,
             token=token,
             status=InvitationStatus.DELETED,
         )
 
-    async def list(self, organization_id: OrganizationID, inviter: UserID) -> List[Invitation]:
+    async def list(self, organization_id: OrganizationID, greeter: UserID) -> List[Invitation]:
         org = self._organizations[organization_id]
         return [
             invitation
             for invitation in org.invitations.values()
-            if invitation.inviter_user_id == inviter
+            if invitation.greeter_user_id == greeter
         ]
 
     async def info(self, organization_id: OrganizationID, token: UUID) -> Invitation:

@@ -159,7 +159,7 @@ class BackendApp:
                     with self.event_bus.connection_context() as event_bus_ctx:
 
                         def _on_invite_status_changed(
-                            event, organization_id, inviter, token, status
+                            event, organization_id, greeter, token, status
                         ):
                             if (
                                 status == InvitationStatus.DELETED

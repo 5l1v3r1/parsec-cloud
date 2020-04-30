@@ -17,24 +17,24 @@ from parsec.api.data.base import BaseAPIData, BaseSchema
 
 
 def generate_sas_codes(
-    invitee_nonce: bytes, inviter_nonce: bytes, shared_secret_key: SecretKey
+    claimer_nonce: bytes, greeter_nonce: bytes, shared_secret_key: SecretKey
 ) -> Tuple[int, int]:
     # Computes combined HMAC
-    combined_nonce = invitee_nonce + inviter_nonce
+    combined_nonce = claimer_nonce + greeter_nonce
     # Digest size of 5 bytes so we can split it beween two 20bits SAS
     combined_hmac = shared_secret_key.hmac(combined_nonce, digest_size=5)
 
     hmac_as_int = int.from_bytes(combined_hmac, "big")
     # Big endian number extracted from bits [0, 20[
-    invitee_sas = hmac_as_int % 2 ** 20
+    claimer_sas = hmac_as_int % 2 ** 20
     # Big endian number extracted from bits [20, 40[
-    inviter_sas = (hmac_as_int >> 20) % 2 ** 20
+    greeter_sas = (hmac_as_int >> 20) % 2 ** 20
 
     # # TODO: remove me before the merge
-    # assert invitee_sas == combined_hmac[0] << 12 | combined_hmac[1] << 4 | combined_hmac[2] >> 4
-    # assert inviter_sas == (combined_hmac[2] & 0xF) << 16 | combined_hmac[3] << 8 | combined_hmac[4]
+    # assert claimer_sas == combined_hmac[0] << 12 | combined_hmac[1] << 4 | combined_hmac[2] >> 4
+    # assert greeter_sas == (combined_hmac[2] & 0xF) << 16 | combined_hmac[3] << 8 | combined_hmac[4]
 
-    return invitee_sas, inviter_sas
+    return claimer_sas, greeter_sas
 
 
 def generate_sas_code_candidates(valid_sas: int, size: int = 3) -> List[int]:
@@ -49,7 +49,7 @@ def generate_sas_code_candidates(valid_sas: int, size: int = 3) -> List[int]:
 class InviteUserData(BaseAPIData):
     class SCHEMA_CLS(BaseSchema):
         type = fields.CheckedConstant("invite_user_data", required=True)
-        # Invitee ask for device_id/human_handle, but inviter has final word on this
+        # Claimer ask for device_id/human_handle, but greeter has final word on this
         requested_device_id = DeviceIDField(required=True)
         requested_human_handle = HumanHandleField(allow_none=True, missing=None)
         # Note claiming user also imply creating a first device
@@ -89,7 +89,7 @@ class InviteUserConfirmation(BaseAPIData):
 class InviteDeviceData(BaseAPIData):
     class SCHEMA_CLS(BaseSchema):
         type = fields.CheckedConstant("invite_device_data", required=True)
-        # Invitee ask for device_name, but inviter has final word on this
+        # Claimer ask for device_name, but greeter has final word on this
         requested_device_name = DeviceNameField(required=True)
         verify_key = fields.VerifyKey(required=True)
 
