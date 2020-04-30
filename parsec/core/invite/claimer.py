@@ -37,7 +37,7 @@ async def claimer_retreive_info(
 
     if rep["type"] == InvitationType.USER:
         return UserClaimInitialCtx(
-            claimer_email=rep["claimer_email"],
+            claimer_email=rep["invitee_email"],
             greeter_user_id=rep["inviter_user_id"],
             greeter_human_handle=rep["inviter_human_handle"],
             cmds=cmds,
@@ -197,18 +197,6 @@ class UserClaimInProgress3Ctx:
     async def do_claim_user(
         self, requested_device_id: DeviceID, requested_human_handle: HumanHandle
     ) -> LocalDevice:
-        rep = await self._cmds.invite_3a_invitee_signify_trust()
-        if rep["status"] == "invalid_state":
-            raise InvitePeerResetError()
-        elif rep["status"] != "ok":
-            raise InviteError(f"Backend error during step 3a: {rep}")
-
-        rep = await self._cmds.invite_3b_invitee_wait_peer_trust()
-        if rep["status"] == "invalid_state":
-            raise InvitePeerResetError()
-        elif rep["status"] != "ok":
-            raise InviteError(f"Backend error during step 3b: {rep}")
-
         private_key = PrivateKey.generate()
         signing_key = SigningKey.generate()
 

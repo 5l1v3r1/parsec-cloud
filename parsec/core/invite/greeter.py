@@ -288,6 +288,7 @@ class UserGreetInProgress4Ctx:
                 user_id=device_id.user_id,
                 human_handle=human_handle,
                 public_key=self._public_key,
+                is_admin=is_admin,
             ).dump_and_sign(author.signing_key)
 
             device_certificate = DeviceCertificateContent(
